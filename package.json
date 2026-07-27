@@ -1,0 +1,40 @@
+{
+  "name": "nuvolexlauncher",
+  "private": true,
+  "version": "0.6.5",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:website": "vite --config website/vite.config.ts",
+    "skins:expand": "node scripts/expand-skin-catalog.mjs",
+    "icons:sync": "node scripts/sync-icons.mjs",
+    "build": "npm run icons:sync && tsc && vite build",
+    "build:website": "tsc -p website/tsconfig.json && vite build --config website/vite.config.ts",
+    "preview": "vite preview",
+    "preview:website": "vite preview --config website/vite.config.ts",
+    "tauri": "tauri",
+    "tauri:dev": "node scripts/dev-with-api.mjs",
+    "api": "npm run start --prefix api",
+    "api:dev": "npm run dev --prefix api"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "^2",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tailwindcss": "^4.1.8",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
