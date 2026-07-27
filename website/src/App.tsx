@@ -15,6 +15,7 @@ import { DocsPage } from "./pages/DocsPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
+import { AdminPage } from "./pages/AdminPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="feedback" element={<FeedbackPage />} />
         <Route path="privacy" element={<PrivacyPage />} />
         <Route path="terms" element={<TermsPage />} />
+        <Route path="admin" element={<AdminPage />} />
         <Route
           path="skins"
           element={
