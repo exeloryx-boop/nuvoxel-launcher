@@ -69,7 +69,15 @@ interface Violation {
   resolved: boolean;
 }
 
-const API_BASE = "https://nuvoxel-launcher.onrender.com";
+const getApiBase = () => {
+  if (typeof window !== "undefined" && window.location.origin) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "https://nuvoxel-launcher.onrender.com";
+    }
+    return window.location.origin;
+  }
+  return "https://nuvoxel-launcher.onrender.com";
+};
 
 type Tab = "overview" | "users" | "launcher" | "moderation";
 
@@ -92,22 +100,25 @@ export function AdminPage() {
   const [modReason, setModReason] = useState("");
 
   const fetchData = async () => {
-    if (!auth?.token) return;
     setLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${auth.token}` };
+      const apiBase = getApiBase();
+      const headers: Record<string, string> = {};
+      if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+      }
       const [statsRes, usersRes, chatRes, violRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/stats`, { headers }),
-        fetch(`${API_BASE}/admin/users`, { headers }),
-        fetch(`${API_BASE}/admin/chat`, { headers }),
-        fetch(`${API_BASE}/admin/violations`, { headers }),
+        fetch(`${apiBase}/admin/stats`, { headers }),
+        fetch(`${apiBase}/admin/users`, { headers }),
+        fetch(`${apiBase}/admin/chat`, { headers }),
+        fetch(`${apiBase}/admin/violations`, { headers }),
       ]);
       if (statsRes.ok) setStats(await statsRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
       if (chatRes.ok) setChatMessages(await chatRes.json());
       if (violRes.ok) setViolations(await violRes.json());
-    } catch {
-      /* offline fallback */
+    } catch (e) {
+      console.error("Admin fetch error:", e);
     } finally {
       setLoading(false);
     }
@@ -123,7 +134,7 @@ export function AdminPage() {
   const handleToggleRole = async (userId: string, currentRole: string) => {
     const newRole = currentRole === "admin" ? "user" : "admin";
     try {
-      await fetch(`${API_BASE}/admin/users/role`, {
+      await fetch(`${getApiBase()}/admin/users/role`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -142,7 +153,7 @@ export function AdminPage() {
   const handleDeleteUser = async (userId: string, username: string) => {
     if (!confirm(`Видалити користувача ${username}?`)) return;
     try {
-      await fetch(`${API_BASE}/admin/users/delete`, {
+      await fetch(`${getApiBase()}/admin/users/delete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -160,7 +171,7 @@ export function AdminPage() {
 
   const handleBan = async (userId: string, duration: number, reason: string) => {
     try {
-      await fetch(`${API_BASE}/admin/users/ban`, {
+      await fetch(`${getApiBase()}/admin/users/ban`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,7 +191,7 @@ export function AdminPage() {
 
   const handleMute = async (userId: string, duration: number, reason: string) => {
     try {
-      await fetch(`${API_BASE}/admin/users/mute`, {
+      await fetch(`${getApiBase()}/admin/users/mute`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -200,7 +211,7 @@ export function AdminPage() {
 
   const handleResolveViolation = async (violationId: string) => {
     try {
-      await fetch(`${API_BASE}/admin/violations/resolve`, {
+      await fetch(`${getApiBase()}/admin/violations/resolve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

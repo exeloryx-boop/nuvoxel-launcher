@@ -471,6 +471,10 @@ app.get("/admin/users", auth, adminAuth, (_req, res) => {
         online: isOnline,
         status: isOnline ? u.status || "online" : "offline",
         friendsCount: (db.friendships[u.id] || []).length,
+        bannedUntil: u.bannedUntil || null,
+        mutedUntil: u.mutedUntil || null,
+        banReason: u.banReason || null,
+        muteReason: u.muteReason || null,
       };
     });
   })

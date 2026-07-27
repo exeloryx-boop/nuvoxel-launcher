@@ -9,7 +9,15 @@ import {
   type WebAuthSession,
 } from "@shared/skins";
 
-const API_BASE = "https://nuvoxel-launcher.onrender.com";
+const getApiBase = () => {
+  if (typeof window !== "undefined" && window.location.origin) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "https://nuvoxel-launcher.onrender.com";
+    }
+    return window.location.origin;
+  }
+  return "https://nuvoxel-launcher.onrender.com";
+};
 
 interface WebsiteState {
   auth: WebAuthSession | null;
@@ -31,7 +39,7 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
 
   login: async (loginInput, password) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch(`${getApiBase()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ login: loginInput, password }),
@@ -57,7 +65,7 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
 
   register: async (username, email, password) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
+      const res = await fetch(`${getApiBase()}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
