@@ -34,7 +34,7 @@ export function isNewerVersion(remote: string, local = APP_VERSION): boolean {
 function updateBaseUrl(): string {
   const fromStore = useAppStore.getState().socialApiUrl?.trim();
   if (fromStore) return fromStore.replace(/\/$/, "");
-  return "http://127.0.0.1:3847";
+  return "https://nuvoxel-launcher.onrender.com";
 }
 
 export function useUpdater() {

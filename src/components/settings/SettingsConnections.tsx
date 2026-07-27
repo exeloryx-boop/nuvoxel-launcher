@@ -100,7 +100,7 @@ export function SettingsConnections() {
           type="url"
           value={socialApiUrl}
           onChange={(e) => setSocialApiUrl(e.target.value)}
-          placeholder="http://127.0.0.1:3847"
+          placeholder="https://nuvoxel-launcher.onrender.com"
           className="w-full rounded-xl border border-border bg-bg-elevated px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
         />
         <p className="mt-2 text-xs text-text-muted">{t("socialApiHint")}</p>
