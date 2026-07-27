@@ -5,13 +5,11 @@ import {
   Shield,
   ShieldCheck,
   UserCheck,
-  UserX,
   Trash2,
   RefreshCw,
   Search,
   Activity,
   Server,
-  HeartPulse,
   Key,
   CheckCircle2,
 } from "lucide-react";

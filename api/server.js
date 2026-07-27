@@ -461,6 +461,25 @@ app.post("/admin/users/delete", (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+const PUBLIC_DIR = join(__dirname, "public");
+if (existsSync(PUBLIC_DIR)) {
+  app.use(express.static(PUBLIC_DIR));
+  app.get("*", (req, res, next) => {
+    if (
+      req.path.startsWith("/auth") ||
+      req.path.startsWith("/admin") ||
+      req.path.startsWith("/friends") ||
+      req.path.startsWith("/presence") ||
+      req.path.startsWith("/updates") ||
+      req.path.startsWith("/curseforge") ||
+      req.path.startsWith("/health")
+    ) {
+      return next();
+    }
+    res.sendFile(join(PUBLIC_DIR, "index.html"));
+  });
+}
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Nuvoxel Launcher social API: http://0.0.0.0:${PORT}`);
   console.log("Health check: GET /health");
