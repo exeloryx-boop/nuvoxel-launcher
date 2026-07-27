@@ -21,6 +21,16 @@ export interface FriendProfile {
   lastSeenAt?: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  text: string;
+  channel: string;
+  recipientId?: string;
+  timestamp: number;
+}
+
 export type SocialApiErrorCode =
   | "UNAUTHORIZED"
   | "INVALID_USERNAME"

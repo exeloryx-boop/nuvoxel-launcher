@@ -1,4 +1,5 @@
 import type {
+  ChatMessage,
   FriendProfile,
   NuvoxelSession,
   NuvoxelUser,
@@ -139,6 +140,36 @@ export async function sendPresence(
     token,
     body: JSON.stringify({ status }),
   });
+}
+
+export async function sendChatMessage(
+  token: string,
+  text: string,
+  channel: string = "global",
+  recipientId?: string,
+): Promise<ChatMessage> {
+  return request("/chat/send", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ text, channel, recipientId }),
+  });
+}
+
+export async function fetchGlobalChat(): Promise<ChatMessage[]> {
+  return request<ChatMessage[]>("/chat/global");
+}
+
+export async function fetchDMChat(
+  token: string,
+  otherUserId: string,
+): Promise<ChatMessage[]> {
+  return request<ChatMessage[]>(`/chat/dm/${otherUserId}`, { token });
+}
+
+export async function fetchUserProfile(
+  userId: string,
+): Promise<FriendProfile> {
+  return request<FriendProfile>(`/users/${userId}`);
 }
 
 export function sessionFromAuth(

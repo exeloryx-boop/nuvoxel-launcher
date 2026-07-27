@@ -15,6 +15,7 @@ import {
   Trophy,
   Users,
   ArrowUpCircle,
+  MessageSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -99,6 +100,8 @@ export function HomePage() {
   const setShowNuvoxelLogin = useAppStore((s) => s.setShowNuvoxelLogin);
 
   const setShowAddFriendModal = useAppStore((s) => s.setShowAddFriendModal);
+
+  const setShowChatModal = useAppStore((s) => s.setShowChatModal);
 
   const nuvoxelSession = useAppStore((s) => s.nuvoxelSession);
 
@@ -537,6 +540,15 @@ export function HomePage() {
                         />
                       </button>
                   ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowChatModal(true)}
+                    className="no-drag flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/20 text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-white"
+                    title="Чат спільноти"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
 
                   <button
                     type="button"

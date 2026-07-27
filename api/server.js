@@ -461,11 +461,118 @@ app.post("/admin/users/delete", (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+// --- CHAT ENDPOINTS ---
+const MAX_CHAT_HISTORY = 200;
+
+// Send a chat message (global or DM)
+app.post("/chat/send", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    if (!db.chatMessages) db.chatMessages = [];
+    const user = db.users[req.auth.sub];
+    if (!user) throw new ApiError(404, "NOT_FOUND");
+
+    const text = String(req.body.text ?? "").trim().slice(0, 500);
+    const channel = String(req.body.channel ?? "global").trim();
+    const recipientId = req.body.recipientId || null;
+
+    if (!text) throw new ApiError(400, "EMPTY_MESSAGE");
+
+    const msg = {
+      id: randomUUID(),
+      userId: user.id,
+      username: user.username,
+      text,
+      channel,
+      recipientId,
+      timestamp: Date.now(),
+    };
+    db.chatMessages.push(msg);
+    if (db.chatMessages.length > MAX_CHAT_HISTORY * 3) {
+      db.chatMessages = db.chatMessages.slice(-MAX_CHAT_HISTORY);
+    }
+    saveDb(db);
+    return msg;
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Get global chat messages
+app.get("/chat/global", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const msgs = (db.chatMessages || [])
+      .filter((m) => m.channel === "global")
+      .slice(-100);
+    return msgs;
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Get DM messages between two users
+app.get("/chat/dm/:otherUserId", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const myId = req.auth.sub;
+    const otherId = req.params.otherUserId;
+    const msgs = (db.chatMessages || [])
+      .filter((m) => m.channel === "dm" &&
+        ((m.userId === myId && m.recipientId === otherId) ||
+         (m.userId === otherId && m.recipientId === myId)))
+      .slice(-100);
+    return msgs;
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Get user profile by id
+app.get("/users/:userId", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const user = db.users[_req.params.userId];
+    if (!user) throw new ApiError(404, "NOT_FOUND");
+    return publicUser(user);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Search users by username
+app.get("/users", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const q = String(_req.query.q ?? "").trim().toLowerCase();
+    if (!q) return [];
+    return Object.values(db.users)
+      .filter((u) => u.username.toLowerCase().includes(q))
+      .slice(0, 20)
+      .map(publicUser);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: get all chat messages
+app.get("/admin/chat", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return (db.chatMessages || []).slice(-200).map((m) => ({
+      ...m,
+      username: m.username || db.users[m.userId]?.username || "deleted",
+    }));
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
   // SPA fallback — serve index.html for all non-API routes
-  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health"];
+  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health", "/chat/", "/users"];
   app.get("*", (req, res, next) => {
     if (API_PREFIXES.some((p) => req.path.startsWith(p))) {
       return next();

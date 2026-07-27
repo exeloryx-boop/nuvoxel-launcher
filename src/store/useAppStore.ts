@@ -274,6 +274,7 @@ interface AppState {
   socialApiUrl: string;
   socialApiOnline: boolean;
   showAddFriendModal: boolean;
+  showChatModal: boolean;
   showJavaPathModal: boolean;
   javaPathModalError: string | null;
   javaPathRetryPackId: string | null;
@@ -400,6 +401,7 @@ interface AppState {
   setShowVersionPicker: (v: boolean) => void;
   setShowNuvoxelLogin: (v: boolean) => void;
   setShowAddFriendModal: (v: boolean) => void;
+  setShowChatModal: (v: boolean) => void;
   setShowJavaPathModal: (v: boolean) => void;
   openJavaPathModal: (error: string, retryPackId?: string | null) => void;
   setSocialApiUrl: (url: string) => void;
@@ -540,6 +542,7 @@ export const useAppStore = create<AppState>()(
       socialApiUrl: "",
       socialApiOnline: false,
       showAddFriendModal: false,
+      showChatModal: false,
 
       addLocalFriend: (nameOrCode) => {
         const trimmed = nameOrCode.trim();
@@ -1835,6 +1838,7 @@ export const useAppStore = create<AppState>()(
       setShowVersionPicker: (v) => set({ showVersionPicker: v }),
       setShowNuvoxelLogin: (v) => set({ showNuvoxelLogin: v }),
       setShowAddFriendModal: (v) => set({ showAddFriendModal: v }),
+      setShowChatModal: (v) => set({ showChatModal: v }),
       setShowJavaPathModal: (v) =>
         set({
           showJavaPathModal: v,

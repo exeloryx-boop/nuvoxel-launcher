@@ -9,6 +9,7 @@ import { VersionPickerOverlay } from "../modals/VersionPickerOverlay";
 import { NuvoxelLoginModal } from "../modals/NuvoxelLoginModal";
 import { CreatePackModal } from "../modals/CreatePackModal";
 import { AddFriendModal } from "../modals/AddFriendModal";
+import { ChatModal } from "../modals/ChatModal";
 import { JavaPathModal } from "../modals/JavaPathModal";
 import { useAppStore, useHasAccount } from "../../store/useAppStore";
 import { useFriendsSync } from "../../hooks/useFriendsSync";
@@ -29,6 +30,8 @@ export function AppLayout() {
   const showCreatePackModal = useAppStore((s) => s.showCreatePackModal);
   const showNuvoxelLogin = useAppStore((s) => s.showNuvoxelLogin);
   const showAddFriendModal = useAppStore((s) => s.showAddFriendModal);
+  const showChatModal = useAppStore((s) => s.showChatModal);
+  const setShowChatModal = useAppStore((s) => s.setShowChatModal);
   const showJavaPathModal = useAppStore((s) => s.showJavaPathModal);
 
   useGameSession();
@@ -44,6 +47,7 @@ export function AppLayout() {
     showNuvoxelLogin ||
     showCreatePackModal ||
     showAddFriendModal ||
+    showChatModal ||
     showJavaPathModal;
 
   useEffect(() => {
@@ -87,6 +91,7 @@ export function AppLayout() {
       <AddAccountModal />
       <CreatePackModal />
       <AddFriendModal />
+      {showChatModal && <ChatModal onClose={() => setShowChatModal(false)} />}
       <JavaPathModal />
     </div>
   );
