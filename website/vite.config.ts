@@ -18,7 +18,7 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    outDir: path.resolve(__dirname, "dist"),
+    outDir: path.resolve(__dirname, "../api/public"),
     emptyOutDir: true,
   },
 });
