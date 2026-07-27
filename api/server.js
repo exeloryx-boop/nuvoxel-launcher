@@ -383,6 +383,84 @@ app.delete("/friends/:friendId", auth, (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+// --- ADMIN ENDPOINTS ---
+app.get("/admin/stats", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const usersArr = Object.values(db.users);
+    const now = Date.now();
+    const onlineUsers = usersArr.filter((u) => now - u.lastSeenAt < ONLINE_WINDOW_MS).length;
+    let totalFriendships = 0;
+    for (const list of Object.values(db.friendships)) {
+      totalFriendships += (list || []).length;
+    }
+    return {
+      totalUsers: usersArr.length,
+      onlineUsers,
+      totalFriendships: Math.floor(totalFriendships / 2),
+      uptimeSeconds: Math.floor(process.uptime()),
+      dbSize: JSON.stringify(db).length,
+    };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.get("/admin/users", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const now = Date.now();
+    return Object.values(db.users).map((u) => {
+      const isOnline = now - u.lastSeenAt < ONLINE_WINDOW_MS;
+      return {
+        id: u.id,
+        username: u.username,
+        email: u.email || "—",
+        friendCode: u.friendCode,
+        role: u.role || "user",
+        createdAt: u.createdAt || u.lastSeenAt,
+        lastSeenAt: u.lastSeenAt,
+        online: isOnline,
+        status: isOnline ? u.status || "online" : "offline",
+        friendsCount: (db.friendships[u.id] || []).length,
+      };
+    });
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/admin/users/role", (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId, role } = req.body || {};
+    const user = db.users[userId];
+    if (!user) throw new ApiError(404, "USER_NOT_FOUND");
+    user.role = role === "admin" ? "admin" : "user";
+    saveDb(db);
+    return { ok: true, userId, role: user.role };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/admin/users/delete", (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId } = req.body || {};
+    if (!db.users[userId]) throw new ApiError(404, "USER_NOT_FOUND");
+    delete db.users[userId];
+    delete db.friendships[userId];
+    for (const id in db.friendships) {
+      db.friendships[id] = (db.friendships[id] || []).filter((fId) => fId !== userId);
+    }
+    saveDb(db);
+    return { ok: true, deletedUserId: userId };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Nuvoxel Launcher social API: http://0.0.0.0:${PORT}`);
   console.log("Health check: GET /health");
