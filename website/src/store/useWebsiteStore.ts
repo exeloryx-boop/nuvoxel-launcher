@@ -40,31 +40,18 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       if (!res.ok) {
         return { ok: false, error: data.error || "LOGIN_FAILED" };
       }
-      const username = data.user?.username || loginInput;
-      const isAdmin = username.toLowerCase() === "admin" || loginInput.toLowerCase().includes("admin");
       const session: WebAuthSession = {
-        email: data.user?.email || (loginInput.includes("@") ? loginInput : `${username}@nuvoxel.net`),
-        username,
+        email: data.user?.email || `${data.user?.username}@nuvoxel.net`,
+        username: data.user?.username || loginInput,
         loggedIn: true,
-        role: isAdmin ? "admin" : "user",
+        role: data.user?.role || "user",
         token: data.token,
       };
       saveWebAuth(session);
       set({ auth: session });
       return { ok: true };
     } catch {
-      // Fallback local login for dev/test
-      const username = loginInput.includes("@") ? loginInput.split("@")[0] : loginInput;
-      const isAdmin = username.toLowerCase() === "admin" || loginInput.toLowerCase().includes("admin");
-      const session: WebAuthSession = {
-        email: loginInput.includes("@") ? loginInput : `${username}@nuvoxel.net`,
-        username,
-        loggedIn: true,
-        role: isAdmin ? "admin" : "user",
-      };
-      saveWebAuth(session);
-      set({ auth: session });
-      return { ok: true };
+      return { ok: false, error: "NETWORK_ERROR" };
     }
   },
 
@@ -79,28 +66,18 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       if (!res.ok) {
         return { ok: false, error: data.error || "REGISTRATION_FAILED" };
       }
-      const isAdmin = username.toLowerCase() === "admin" || email.toLowerCase().includes("admin");
       const session: WebAuthSession = {
-        email: email || `${username}@nuvoxel.net`,
-        username,
+        email: data.user?.email || email || `${username}@nuvoxel.net`,
+        username: data.user?.username || username,
         loggedIn: true,
-        role: isAdmin ? "admin" : "user",
+        role: data.user?.role || "user",
         token: data.token,
       };
       saveWebAuth(session);
       set({ auth: session });
       return { ok: true };
     } catch {
-      const isAdmin = username.toLowerCase() === "admin" || email.toLowerCase().includes("admin");
-      const session: WebAuthSession = {
-        email: email || `${username}@nuvoxel.net`,
-        username,
-        loggedIn: true,
-        role: isAdmin ? "admin" : "user",
-      };
-      saveWebAuth(session);
-      set({ auth: session });
-      return { ok: true };
+      return { ok: false, error: "NETWORK_ERROR" };
     }
   },
 

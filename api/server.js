@@ -54,6 +54,34 @@ const CURSEFORGE_API_KEY =
   process.env.VITE_CURSEFORGE_API_KEY?.trim() ||
   "";
 
+// --- Profanity filter ---
+const BAD_WORDS = [
+  "сука", "блять", "бля", "хуй", "пизд", "єбан", "єбат", "їбат", "нахуй",
+  "піздец", "мудак", "залупа", "шлюха", "блядь", "дебіл", "даун", "урод",
+  "fuck", "shit", "bitch", "asshole", "dick", "pussy", "nigger", "faggot",
+  "bastard", "whore", "cunt", "damn", "retard", "idiot",
+];
+function containsProfanity(text) {
+  const lower = text.toLowerCase().replace(/[^a-zа-яіїєґ]/g, "");
+  return BAD_WORDS.some((w) => lower.includes(w));
+}
+function findProfanityWords(text) {
+  const lower = text.toLowerCase().replace(/[^a-zа-яіїєґ ]/g, "");
+  return BAD_WORDS.filter((w) => lower.includes(w));
+}
+
+// --- Ban / Mute checking ---
+function isUserBanned(user) {
+  if (!user.bannedUntil) return false;
+  if (user.bannedUntil === -1) return true; // permanent
+  return Date.now() < user.bannedUntil;
+}
+function isUserMuted(user) {
+  if (!user.mutedUntil) return false;
+  if (user.mutedUntil === -1) return true; // permanent
+  return Date.now() < user.mutedUntil;
+}
+
 class ApiError extends Error {
   constructor(status, code) {
     super(code);
@@ -109,18 +137,24 @@ function uniqueFriendCode(db) {
 
 function publicUser(user) {
   const online = Date.now() - user.lastSeenAt < ONLINE_WINDOW_MS;
+  const role = user.role || (user.username.toLowerCase() === "admin" ? "admin" : "user");
   return {
     id: user.id,
     username: user.username,
     friendCode: user.friendCode,
+    role,
     online,
     status: online ? user.status || "online" : "offline",
     lastSeenAt: user.lastSeenAt,
   };
 }
 
-function issueToken(userId, username) {
-  return jwt.sign({ sub: userId, username }, JWT_SECRET, { expiresIn: "30d" });
+function issueToken(user) {
+  return jwt.sign(
+    { sub: user.id, username: user.username, role: user.role || "user" },
+    JWT_SECRET,
+    { expiresIn: "30d" }
+  );
 }
 
 const app = express();
@@ -155,6 +189,13 @@ function auth(req, res, next) {
   } catch {
     return res.status(401).json({ error: "UNAUTHORIZED" });
   }
+}
+
+function adminAuth(req, res, next) {
+  if (!req.auth || req.auth.role !== "admin") {
+    return res.status(403).json({ error: "FORBIDDEN_NOT_ADMIN" });
+  }
+  next();
 }
 
 function sendError(res, error) {
@@ -239,23 +280,26 @@ app.post("/auth/register", (req, res) => {
     const id = randomUUID();
     const now = Date.now();
     const friendCode = uniqueFriendCode(db);
+    const role = username.toLowerCase() === "admin" ? "admin" : "user";
 
-    db.users[id] = {
+    const userObj = {
       id,
       username,
       email,
+      role,
       passwordHash: bcrypt.hashSync(password, 10),
       friendCode,
       createdAt: now,
       lastSeenAt: now,
       status: "online",
     };
+    db.users[id] = userObj;
     db.friendships[id] = [];
     saveDb(db);
 
     return {
-      token: issueToken(id, username),
-      user: { id, username, friendCode, email },
+      token: issueToken(userObj),
+      user: { id, username, friendCode, email, role },
     };
   })
     .then((payload) => res.json(payload))
@@ -281,17 +325,21 @@ app.post("/auth/login", (req, res) => {
       throw new ApiError(401, "INVALID_CREDENTIALS");
     }
 
+    if (!user.role) {
+      user.role = user.username.toLowerCase() === "admin" ? "admin" : "user";
+    }
     user.lastSeenAt = Date.now();
     user.status = "online";
     saveDb(db);
 
     return {
-      token: issueToken(user.id, user.username),
+      token: issueToken(user),
       user: {
         id: user.id,
         username: user.username,
         friendCode: user.friendCode,
         email: user.email,
+        role: user.role,
       },
     };
   })
@@ -384,7 +432,7 @@ app.delete("/friends/:friendId", auth, (req, res) => {
 });
 
 // --- ADMIN ENDPOINTS ---
-app.get("/admin/stats", (_req, res) => {
+app.get("/admin/stats", auth, adminAuth, (_req, res) => {
   void withDb(() => {
     const db = loadDb();
     const usersArr = Object.values(db.users);
@@ -406,7 +454,7 @@ app.get("/admin/stats", (_req, res) => {
     .catch((e) => sendError(res, e));
 });
 
-app.get("/admin/users", (_req, res) => {
+app.get("/admin/users", auth, adminAuth, (_req, res) => {
   void withDb(() => {
     const db = loadDb();
     const now = Date.now();
@@ -417,7 +465,7 @@ app.get("/admin/users", (_req, res) => {
         username: u.username,
         email: u.email || "—",
         friendCode: u.friendCode,
-        role: u.role || "user",
+        role: u.role || (u.username.toLowerCase() === "admin" ? "admin" : "user"),
         createdAt: u.createdAt || u.lastSeenAt,
         lastSeenAt: u.lastSeenAt,
         online: isOnline,
@@ -430,7 +478,7 @@ app.get("/admin/users", (_req, res) => {
     .catch((e) => sendError(res, e));
 });
 
-app.post("/admin/users/role", (req, res) => {
+app.post("/admin/users/role", auth, adminAuth, (req, res) => {
   void withDb(() => {
     const db = loadDb();
     const { userId, role } = req.body || {};
@@ -444,7 +492,7 @@ app.post("/admin/users/role", (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
-app.post("/admin/users/delete", (req, res) => {
+app.post("/admin/users/delete", auth, adminAuth, (req, res) => {
   void withDb(() => {
     const db = loadDb();
     const { userId } = req.body || {};
@@ -469,14 +517,40 @@ app.post("/chat/send", auth, (req, res) => {
   void withDb(() => {
     const db = loadDb();
     if (!db.chatMessages) db.chatMessages = [];
+    if (!db.violations) db.violations = [];
     const user = db.users[req.auth.sub];
     if (!user) throw new ApiError(404, "NOT_FOUND");
+
+    // Check ban
+    if (isUserBanned(user)) throw new ApiError(403, "USER_BANNED");
+    // Check mute
+    if (isUserMuted(user)) throw new ApiError(403, "USER_MUTED");
 
     const text = String(req.body.text ?? "").trim().slice(0, 500);
     const channel = String(req.body.channel ?? "global").trim();
     const recipientId = req.body.recipientId || null;
 
     if (!text) throw new ApiError(400, "EMPTY_MESSAGE");
+
+    // Profanity check — log violation
+    const hasProfanity = containsProfanity(text);
+    const foundWords = hasProfanity ? findProfanityWords(text) : [];
+    if (hasProfanity) {
+      db.violations.push({
+        id: randomUUID(),
+        userId: user.id,
+        username: user.username,
+        text,
+        words: foundWords,
+        channel,
+        timestamp: Date.now(),
+        resolved: false,
+      });
+      // Keep violations manageable
+      if (db.violations.length > 500) {
+        db.violations = db.violations.slice(-300);
+      }
+    }
 
     const msg = {
       id: randomUUID(),
@@ -486,6 +560,7 @@ app.post("/chat/send", auth, (req, res) => {
       channel,
       recipientId,
       timestamp: Date.now(),
+      flagged: hasProfanity,
     };
     db.chatMessages.push(msg);
     if (db.chatMessages.length > MAX_CHAT_HISTORY * 3) {
@@ -556,13 +631,88 @@ app.get("/users", (_req, res) => {
 });
 
 // Admin: get all chat messages
-app.get("/admin/chat", (_req, res) => {
+app.get("/admin/chat", auth, adminAuth, (_req, res) => {
   void withDb(() => {
     const db = loadDb();
     return (db.chatMessages || []).slice(-200).map((m) => ({
       ...m,
       username: m.username || db.users[m.userId]?.username || "deleted",
     }));
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: get all profanity violations
+app.get("/admin/violations", auth, adminAuth, (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return (db.violations || []).slice(-100);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: ban a user
+app.post("/admin/users/ban", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId, duration } = req.body || {};
+    const user = db.users[userId];
+    if (!user) throw new ApiError(404, "USER_NOT_FOUND");
+    // duration in minutes, -1 = permanent, 0 = unban
+    if (duration === 0) {
+      delete user.bannedUntil;
+      user.banReason = null;
+    } else if (duration === -1) {
+      user.bannedUntil = -1;
+      user.banReason = req.body.reason || "Порушення правил";
+    } else {
+      user.bannedUntil = Date.now() + (duration || 60) * 60 * 1000;
+      user.banReason = req.body.reason || "Порушення правил";
+    }
+    saveDb(db);
+    return { ok: true, userId, bannedUntil: user.bannedUntil || null };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: mute a user
+app.post("/admin/users/mute", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId, duration } = req.body || {};
+    const user = db.users[userId];
+    if (!user) throw new ApiError(404, "USER_NOT_FOUND");
+    // duration in minutes, -1 = permanent, 0 = unmute
+    if (duration === 0) {
+      delete user.mutedUntil;
+      user.muteReason = null;
+    } else if (duration === -1) {
+      user.mutedUntil = -1;
+      user.muteReason = req.body.reason || "Порушення правил чату";
+    } else {
+      user.mutedUntil = Date.now() + (duration || 30) * 60 * 1000;
+      user.muteReason = req.body.reason || "Порушення правил чату";
+    }
+    saveDb(db);
+    return { ok: true, userId, mutedUntil: user.mutedUntil || null };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: resolve a violation
+app.post("/admin/violations/resolve", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { violationId } = req.body || {};
+    const v = (db.violations || []).find((v) => v.id === violationId);
+    if (!v) throw new ApiError(404, "NOT_FOUND");
+    v.resolved = true;
+    saveDb(db);
+    return { ok: true };
   })
     .then((payload) => res.json(payload))
     .catch((e) => sendError(res, e));
@@ -594,3 +744,4 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 export default app;
+
