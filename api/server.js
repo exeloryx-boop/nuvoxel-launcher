@@ -464,16 +464,10 @@ app.post("/admin/users/delete", (req, res) => {
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
+  // SPA fallback — serve index.html for all non-API routes
+  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health"];
   app.get("*", (req, res, next) => {
-    if (
-      req.path.startsWith("/auth") ||
-      req.path.startsWith("/admin") ||
-      req.path.startsWith("/friends") ||
-      req.path.startsWith("/presence") ||
-      req.path.startsWith("/updates") ||
-      req.path.startsWith("/curseforge") ||
-      req.path.startsWith("/health")
-    ) {
+    if (API_PREFIXES.some((p) => req.path.startsWith(p))) {
       return next();
     }
     res.sendFile(join(PUBLIC_DIR, "index.html"));
