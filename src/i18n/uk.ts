@@ -123,6 +123,7 @@ export const uk: Record<keyof typeof ru, string> = {
   quickLaunch: "Швидкий запуск",
   quickLaunchDesc: "Останні сесії",
   quickLaunchEmpty: "Тут з’являться останні запуски — натисни «Грати»",
+  presetApplied: "Профіль оптимізації застосовано!",
   gameRunningNow: "Minecraft запущено",
   friendsOnline: "0 друзів онлайн",
   premium: "0/3 преміум",

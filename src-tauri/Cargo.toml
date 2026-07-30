@@ -1,6 +1,6 @@
 [package]
 name = "nuvolexlauncher"
-version = "0.6.5"
+version = "0.7.0"
 description = "Nuvoxel Launcher - Minecraft Launcher"
 authors = ["Nuvoxel Launcher"]
 edition = "2021"

@@ -126,6 +126,7 @@ export const en: Record<keyof typeof ru, string> = {
   quickLaunch: "Quick launch",
   quickLaunchDesc: "Recent sessions",
   quickLaunchEmpty: "Recent launches appear here after you play",
+  presetApplied: "Optimization profile applied!",
   gameRunningNow: "Minecraft is running",
   friendsOnline: "0 friends online",
   premium: "0/3 premium",

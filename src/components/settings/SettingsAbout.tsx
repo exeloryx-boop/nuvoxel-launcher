@@ -111,7 +111,7 @@ export function SettingsAbout() {
 
       <SettingCard
         icon={<Sparkles className="h-5 w-5" />}
-        title={t("whatsNew") + " — v0.6.5"}
+        title={t("whatsNew") + " — v0.7.0"}
         description={t("releaseDate")}
       >
         <div className="space-y-2.5">

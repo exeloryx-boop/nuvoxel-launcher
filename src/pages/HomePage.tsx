@@ -50,6 +50,7 @@ import { useComfortableLayout } from "../hooks/useComfortableLayout";
 import { SHIMMER_SURFACE } from "../utils/shimmer";
 import { SystemDetectionBanner } from "../components/home/SystemDetectionBanner";
 import { VoxelCanvas } from "../components/home/VoxelCanvas";
+import { GamePresetPanel } from "../components/home/GamePresetPanel";
 
 
 
@@ -668,6 +669,7 @@ export function HomePage() {
 
         <div className={`shrink-0 ${comfortable ? "mb-5" : "mb-3"}`}>
           <QuickLaunchPanel compact={!comfortable} />
+          <GamePresetPanel />
         </div>
 
         <div className={`shrink-0 ${comfortable ? "" : "pb-2"}`}>

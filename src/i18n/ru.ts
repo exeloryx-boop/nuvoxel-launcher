@@ -124,6 +124,7 @@ export const ru = {
   quickLaunch: "Быстрый запуск",
   quickLaunchDesc: "Недавние сессии",
   quickLaunchEmpty: "Здесь появятся недавние запуски — нажми «Играть»",
+  presetApplied: "Профиль оптимизации применён!",
   gameRunningNow: "Minecraft запущен",
   friendsOnline: "0 в сети друзья",
   premium: "0/3 премиум",
