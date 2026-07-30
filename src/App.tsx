@@ -6,6 +6,7 @@ import { ModPackDetailPage } from "./pages/ModPackDetailPage";
 import { AccountsPage } from "./pages/AccountsPage";
 import { ServersPage } from "./pages/ServersPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ClaudePacksPage } from "./pages/ClaudePacksPage";
 import { useThemeEffect } from "./hooks/useThemeEffect";
 import { useSkinSync } from "./hooks/useSkinSync";
 import { useDevToolsGuard } from "./hooks/useDevToolsGuard";
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="servers" element={<ServersPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="claude-packs" element={<ClaudePacksPage />} />
       </Route>
     </Routes>
   );

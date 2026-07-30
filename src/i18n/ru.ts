@@ -105,6 +105,7 @@ export const ru = {
 
   navHome: "Главная",
   navMods: "Моды и сборки",
+  navClaudePacks: "Claude сборки",
   navServers: "Серверы",
   navAccounts: "Аккаунты",
   navSettings: "Настройки",

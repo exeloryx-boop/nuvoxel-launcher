@@ -107,6 +107,7 @@ export const en: Record<keyof typeof ru, string> = {
 
   navHome: "Home",
   navMods: "Mods & packs",
+  navClaudePacks: "Claude packs",
   navServers: "Servers",
   navAccounts: "Accounts",
   navSettings: "Settings",

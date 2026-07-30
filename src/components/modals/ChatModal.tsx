@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Send, Globe, MessageSquare } from "lucide-react";
 import { ChatMessage, FriendProfile } from "../../types/social";
-import { fetchGlobalChat, fetchDMChat, sendChatMessage } from "../../services/nuvoxelApi";
+import { fetchGlobalChat, fetchDMChat, handleSocialApiError, sendChatMessage } from "../../services/nuvoxelApi";
+import { SocialApiError } from "../../types/social";
 import { useAppStore } from "../../store/useAppStore";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -20,6 +21,7 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,7 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
     if (!text.trim() || !session || sending) return;
 
     setSending(true);
+    setError("");
     const content = text.trim();
     setText("");
 
@@ -64,8 +67,21 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
         const msg = await sendChatMessage(session.token, content, "dm", selectedFriend.id);
         setMessages((prev) => [...prev, msg]);
       }
-    } catch {
-      /* network error */
+    } catch (error) {
+      handleSocialApiError(error);
+      if (error instanceof SocialApiError) {
+        setError(
+          error.code === "USER_MUTED"
+            ? "Вам тимчасово заборонено писати в чат."
+            : error.code === "USER_BANNED"
+              ? "Ваш акаунт заблоковано."
+              : error.code === "UNAUTHORIZED"
+                ? "Сесію завершено. Увійдіть у Nuvoxel ID ще раз."
+                : "Повідомлення не надіслано. Спробуйте ще раз.",
+        );
+      } else {
+        setError("Не вдалося підключитися до чату. Спробуйте ще раз.");
+      }
     } finally {
       setSending(false);
     }
@@ -243,7 +259,9 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
 
             {/* Input Form */}
             {session ? (
-              <form onSubmit={handleSend} className="border-t border-white/10 p-3 flex gap-2">
+              <form onSubmit={handleSend} className="border-t border-white/10 p-3">
+                {error && <p className="mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
+                <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder={
@@ -262,6 +280,7 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
                 >
                   <Send className="h-4 w-4" />
                 </button>
+                </div>
               </form>
             ) : (
               <div className="border-t border-white/10 p-3 text-center text-xs text-zinc-500">

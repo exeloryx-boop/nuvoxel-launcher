@@ -169,6 +169,11 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
+@keyframes page-reveal {
+  from { opacity: 0; transform: translateY(14px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
 .animate-fade-up { animation: fadeUp .7s ease-out both; }
 .animate-fade-in { animation: fadeIn .6s ease-out both; }
 .animate-fade-down { animation: fadeDown .6s ease-out both; }
@@ -189,6 +194,23 @@ a { color: inherit; text-decoration: none; }
 .animate-bounce-in { animation: bounce-in .6s cubic-bezier(.175,.885,.32,1.275) both; }
 .animate-slide-up-fade { animation: slide-up-fade .7s ease-out both; }
 .animate-neon { animation: neon-flicker 3s ease-in-out infinite; }
+
+main > * { animation: page-reveal .5s cubic-bezier(.16,1,.3,1) both; }
+
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--nl-green);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
 
 .delay-100 { animation-delay: .1s; }
 .delay-200 { animation-delay: .2s; }

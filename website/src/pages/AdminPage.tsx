@@ -18,6 +18,7 @@ import {
   VolumeX,
   Ban,
   ShieldAlert,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useWebsiteStore } from "../store/useWebsiteStore";
@@ -69,6 +70,21 @@ interface Violation {
   resolved: boolean;
 }
 
+interface SharedPack {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  minecraftVersion: string;
+  loader: string;
+  modCount: number;
+  authorUsername: string;
+  status: "pending" | "approved" | "blocked";
+  createdAt: number;
+  reviewReason: string | null;
+  mods?: { name: string; projectId: string; versionId: string; catalogSource: string }[];
+}
+
 const getApiBase = () => {
   if (typeof window !== "undefined" && window.location.origin) {
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
@@ -79,7 +95,7 @@ const getApiBase = () => {
   return "https://nuvoxel-launcher.onrender.com";
 };
 
-type Tab = "overview" | "users" | "launcher" | "moderation";
+type Tab = "overview" | "users" | "launcher" | "claude" | "moderation";
 
 export function AdminPage() {
   const auth = useWebsiteStore((s) => s.auth);
@@ -88,6 +104,7 @@ export function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [violations, setViolations] = useState<Violation[]>([]);
+  const [sharedPacks, setSharedPacks] = useState<SharedPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "admin" | "user">("all");
@@ -107,16 +124,18 @@ export function AdminPage() {
       if (auth?.token) {
         headers["Authorization"] = `Bearer ${auth.token}`;
       }
-      const [statsRes, usersRes, chatRes, violRes] = await Promise.all([
+      const [statsRes, usersRes, chatRes, violRes, packsRes] = await Promise.all([
         fetch(`${apiBase}/admin/stats`, { headers }),
         fetch(`${apiBase}/admin/users`, { headers }),
         fetch(`${apiBase}/admin/chat`, { headers }),
         fetch(`${apiBase}/admin/violations`, { headers }),
+        fetch(`${apiBase}/admin/claude/packs`, { headers }),
       ]);
       if (statsRes.ok) setStats(await statsRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
       if (chatRes.ok) setChatMessages(await chatRes.json());
       if (violRes.ok) setViolations(await violRes.json());
+      if (packsRes.ok) setSharedPacks(await packsRes.json());
     } catch (e) {
       console.error("Admin fetch error:", e);
     } finally {
@@ -225,6 +244,33 @@ export function AdminPage() {
     }
   };
 
+  const handlePackReview = async (
+    packId: string,
+    status: "approved" | "blocked",
+  ) => {
+    const reason = status === "blocked"
+      ? window.prompt("Вкажіть причину блокування для автора:")?.trim()
+      : "";
+    if (status === "blocked" && !reason) return;
+    try {
+      const response = await fetch(`${getApiBase()}/admin/claude/packs/review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ packId, status, reason }),
+      });
+      if (!response.ok) throw new Error("review failed");
+      const updated = await response.json() as SharedPack;
+      setSharedPacks((current) => current.map((pack) => pack.id === updated.id ? updated : pack));
+      setStatusMsg(status === "approved" ? "Збірку схвалено" : "Збірку заблоковано, причину надіслано автору");
+    } catch {
+      setStatusMsg("Не вдалося оновити статус збірки");
+    }
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
   const filteredUsers = users.filter((u) => {
     const q = search.toLowerCase();
     const matchesSearch =
@@ -239,6 +285,7 @@ export function AdminPage() {
   const unresolvedViolationsCount = violations.filter((v) => !v.resolved).length;
 
   const tabs: { id: Tab; label: string; icon: typeof Users; badge?: number }[] = [
+    { id: "claude", label: "Claude збірки", icon: Sparkles, badge: sharedPacks.filter((pack) => pack.status === "pending").length },
     { id: "overview", label: "Огляд", icon: Activity },
     { id: "users", label: "Користувачі", icon: Users },
     { id: "launcher", label: "Лаунчер & Чат", icon: Gamepad2 },
@@ -642,6 +689,37 @@ export function AdminPage() {
       )}
 
       {/* ═══ MODERATION & PROFANITY TAB ═══ */}
+      {tab === "claude" && (
+        <div className="space-y-5 animate-slide-up-fade">
+          <div className="glass-card glow-border p-6">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-bold text-white"><Sparkles className="h-5 w-5 text-violet-400" /> Claude збірки — черга перевірки</h3>
+                <p className="mt-1 text-sm text-zinc-400">Схвалюйте сумісні збірки або блокуйте їх з обов'язковим поясненням для автора.</p>
+              </div>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">Очікують: {sharedPacks.filter((pack) => pack.status === "pending").length}</span>
+            </div>
+            <div className="space-y-3">
+              {sharedPacks.map((pack) => (
+                <article key={pack.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><h4 className="font-bold text-white">{pack.name}</h4><span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${pack.status === "approved" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : pack.status === "blocked" ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-amber-500/30 bg-amber-500/10 text-amber-300"}`}>{pack.status === "approved" ? "Схвалено" : pack.status === "blocked" ? "Заблоковано" : "На перевірці"}</span></div>
+                      <p className="mt-1 text-xs text-zinc-400">Автор: {pack.authorUsername} · {pack.minecraftVersion} · {pack.loader} · {pack.modCount} модів · код {pack.code}</p>
+                      {pack.description && <p className="mt-3 text-sm text-zinc-300">{pack.description}</p>}
+                      <p className="mt-3 text-xs text-zinc-500">Моди: {(pack.mods ?? []).map((mod) => `${mod.name} (${mod.catalogSource})`).join(", ") || "без модів"}</p>
+                      {pack.reviewReason && <p className="mt-2 text-xs text-red-300">Причина блокування: {pack.reviewReason}</p>}
+                    </div>
+                    {pack.status === "pending" && <div className="flex shrink-0 gap-2"><button type="button" onClick={() => void handlePackReview(pack.id, "approved")} className="btn-primary btn-micro bg-emerald-600 px-3 py-2 text-xs hover:bg-emerald-700">Схвалити</button><button type="button" onClick={() => void handlePackReview(pack.id, "blocked")} className="btn-micro rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/20">Заблокувати</button></div>}
+                  </div>
+                </article>
+              ))}
+              {sharedPacks.length === 0 && <p className="py-8 text-center text-sm text-zinc-500">У черзі поки немає збірок.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === "moderation" && (
         <div className="space-y-6 animate-slide-up-fade">
           <div className="glass-card glow-border p-6">

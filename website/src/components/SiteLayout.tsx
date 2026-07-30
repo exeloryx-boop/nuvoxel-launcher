@@ -71,18 +71,33 @@ export function SiteLayout() {
               </NavLink>
             ))}
             {auth?.loggedIn && (
-              <NavLink
-                to="/skins"
-                className={({ isActive }) =>
-                  `rounded-lg px-3 py-2 text-sm transition ${
-                    isActive
-                      ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
-                      : "text-zinc-400 hover:text-white"
-                  }`
-                }
-              >
-                {t("navSkins")}
-              </NavLink>
+              <>
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `rounded-lg px-3 py-2 text-sm transition font-medium flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
+                        : "text-zinc-400 hover:text-white"
+                    }`
+                  }
+                >
+                  <User className="h-4 w-4" />
+                  Профіль
+                </NavLink>
+                <NavLink
+                  to="/skins"
+                  className={({ isActive }) =>
+                    `rounded-lg px-3 py-2 text-sm transition ${
+                      isActive
+                        ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
+                        : "text-zinc-400 hover:text-white"
+                    }`
+                  }
+                >
+                  {t("navSkins")}
+                </NavLink>
+              </>
             )}
             {isAdmin && (
               <NavLink
@@ -127,7 +142,7 @@ export function SiteLayout() {
             {auth?.loggedIn ? (
               <div className="flex items-center gap-2">
                 <Link
-                  to={isAdmin ? "/admin" : "/skins"}
+                  to={isAdmin ? "/admin" : "/profile"}
                   className="btn-outline hidden px-3 py-2 text-sm sm:inline-flex items-center gap-1.5"
                 >
                   {isAdmin ? <Shield className="h-4 w-4 text-purple-400" /> : <User className="h-4 w-4 text-[var(--nl-green)]" />}

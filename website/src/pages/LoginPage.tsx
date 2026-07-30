@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Loader2, LogIn, UserPlus, ShieldCheck, Palette, Sparkles } from "lucide-react";
+import { Loader2, LogIn, UserPlus, ShieldCheck, Palette, Sparkles, Gamepad2, Info } from "lucide-react";
 import { useWebsiteStore } from "../store/useWebsiteStore";
 import { useWebI18n } from "../hooks/useWebI18n";
 
@@ -11,9 +11,9 @@ export function LoginPage() {
   const auth = useWebsiteStore((s) => s.auth);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string })?.from ?? (auth?.role === "admin" ? "/admin" : "/skins");
+  const from = (location.state as { from?: string })?.from ?? (auth?.role === "admin" ? "/admin" : "/profile");
 
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "launcher">("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,12 +32,12 @@ export function LoginPage() {
     setErrorMsg("");
     setLoading(true);
 
-    if (mode === "login") {
+    if (mode === "login" || mode === "launcher") {
       const res = await login(email || username, password);
       setLoading(false);
       if (!res.ok) {
         if (res.error === "INVALID_CREDENTIALS") {
-          setErrorMsg("Невірний логін або пароль");
+          setErrorMsg("Невірний логін або пароль лаунчера");
         } else {
           setErrorMsg(res.error || "Помилка входу");
         }
@@ -66,19 +66,33 @@ export function LoginPage() {
   };
 
   const features = [
+    { icon: Gamepad2, text: "Єдиний акаунт для сайту, Nuvoxel Launcher та гри" },
     { icon: Palette, text: t("loginFeat1") },
     { icon: Sparkles, text: t("loginFeat2") },
-    { icon: ShieldCheck, text: "Єдиний акаунт для сайту, лаунчера та гри з друзями" },
+    { icon: ShieldCheck, text: "Миттєва синхронізація друзів та скінів" },
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-16 lg:flex-row lg:px-6">
-      <div className="flex-1">
+    <div className="relative mx-auto flex max-w-6xl flex-col gap-12 px-4 py-16 lg:flex-row lg:px-6 overflow-hidden">
+      {/* Background Orbs */}
+      <div className="orb orb-1 opacity-30"></div>
+      <div className="orb orb-2 opacity-30"></div>
+
+      <div className="flex-1 relative z-10 animate-fade-up">
         <p className="section-label mb-2">{t("loginLabel")}</p>
-        <h1 className="text-4xl font-bold">
-          {mode === "login" ? t("loginTitle") : "Створення акаунту Wynsense"}
+        <h1 className="text-4xl font-bold text-white tracking-tight">
+          {mode === "register" ? "Створення акаунту Nuvoxel" : "Вхід у системи Nuvoxel"}
         </h1>
-        <p className="mt-4 text-zinc-400">{t("loginDesc")}</p>
+        <p className="mt-4 text-zinc-400 leading-relaxed">
+          Усі акаунти Nuvoxel Launcher та веб-сайту є повністю єдиними. Якщо у вас вже є акаунт у лаунчері — просто увійдіть під своїми даними!
+        </p>
+
+        <div className="mt-6 rounded-2xl border border-[var(--nl-green)]/30 bg-[var(--nl-green)]/10 p-4 backdrop-blur-md flex items-start gap-3">
+          <Info className="h-5 w-5 shrink-0 text-[var(--nl-green)] mt-0.5" />
+          <p className="text-xs text-zinc-300">
+            <strong>Порада:</strong> Зареєструвавшись в Nuvoxel Launcher, ви автоматично маєте доступ до сайту та зміни скінів!
+          </p>
+        </div>
 
         <ul className="mt-8 space-y-4">
           {features.map((f) => (
@@ -90,25 +104,40 @@ export function LoginPage() {
         </ul>
       </div>
 
-      <div className="glass-card w-full max-w-md p-8 lg:shrink-0">
-        <div className="mb-6 flex rounded-lg border border-white/10 bg-black/40 p-1">
+      <div className="glass-card glow-border w-full max-w-md p-8 lg:shrink-0 relative z-10 animate-fade-up delay-100">
+        {/* Mode Selector Tabs */}
+        <div className="mb-6 flex rounded-xl border border-white/10 bg-black/50 p-1">
           <button
             type="button"
             onClick={() => { setMode("login"); setErrorMsg(""); }}
-            className={`flex-1 rounded-md py-2 text-sm font-semibold transition ${
+            className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition ${
               mode === "login"
-                ? "bg-[var(--nl-green)] text-white shadow-md"
+                ? "bg-[var(--nl-green)] text-white shadow-md shadow-[var(--nl-green)]/20"
                 : "text-zinc-400 hover:text-white"
             }`}
           >
             Вхід
           </button>
+
+          <button
+            type="button"
+            onClick={() => { setMode("launcher"); setErrorMsg(""); }}
+            className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition flex items-center justify-center gap-1 ${
+              mode === "launcher"
+                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Gamepad2 className="h-3.5 w-3.5" />
+            Акаунт Лаунчера
+          </button>
+
           <button
             type="button"
             onClick={() => { setMode("register"); setErrorMsg(""); }}
-            className={`flex-1 rounded-md py-2 text-sm font-semibold transition ${
+            className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition ${
               mode === "register"
-                ? "bg-[var(--nl-green)] text-white shadow-md"
+                ? "bg-[var(--nl-green)] text-white shadow-md shadow-[var(--nl-green)]/20"
                 : "text-zinc-400 hover:text-white"
             }`}
           >
@@ -117,87 +146,93 @@ export function LoginPage() {
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 animate-bounce-in">
             {errorMsg}
+          </div>
+        )}
+
+        {mode === "launcher" && (
+          <div className="mb-4 rounded-xl border border-purple-500/30 bg-purple-500/10 p-3 text-xs text-purple-300">
+            Введіть нікнейм або email та пароль, які ви використовуєте в <strong>Nuvoxel Launcher</strong>.
           </div>
         )}
 
         <form onSubmit={submit} className="space-y-4">
           {mode === "register" && (
             <label className="block">
-              <span className="text-sm text-zinc-400">Нікнейм гравця</span>
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Нікнейм гравця</span>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[var(--nl-green)]"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[var(--nl-green)] transition"
                 placeholder="Steve"
               />
             </label>
           )}
 
           <label className="block">
-            <span className="text-sm text-zinc-400">
-              {mode === "login" ? "Email або Нікнейм" : "Email адреса"}
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              {mode === "register" ? "Email адреса" : "Нікнейм або Email"}
             </span>
             <input
               type={mode === "register" ? "email" : "text"}
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[var(--nl-green)]"
-              placeholder={mode === "login" ? "steve / player@mail.com" : "player@mail.com"}
+              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[var(--nl-green)] transition"
+              placeholder={mode === "register" ? "player@mail.com" : "Steve або player@mail.com"}
             />
           </label>
 
           <label className="block">
-            <span className="text-sm text-zinc-400">{t("loginPassword")}</span>
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Пароль</span>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[var(--nl-green)]"
+              className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[var(--nl-green)] transition"
               placeholder="••••••••"
             />
           </label>
 
           {mode === "register" && (
             <label className="block">
-              <span className="text-sm text-zinc-400">Підтвердження пароля</span>
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Підтвердження пароля</span>
               <input
                 type="password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[var(--nl-green)]"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-[var(--nl-green)] transition"
                 placeholder="••••••••"
               />
             </label>
           )}
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-sm font-bold shadow-lg">
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
-            ) : mode === "login" ? (
+            ) : mode === "login" || mode === "launcher" ? (
               <>
                 <LogIn className="h-5 w-5" />
-                {t("login")}
+                {mode === "launcher" ? "Увійти через Лаунчер" : t("login")}
               </>
             ) : (
               <>
                 <UserPlus className="h-5 w-5" />
-                Зареєструватися
+                Створити акаунт
               </>
             )}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-500">
-          {t("loginNoAccount")}{" "}
+        <p className="mt-6 text-center text-xs text-zinc-500">
+          У вас ще немає акаунту?{" "}
           <Link to="/download" className="text-[var(--nl-green)] hover:underline font-semibold">
-            {t("loginGetLauncher")}
+            Завантажити Nuvoxel Launcher
           </Link>
         </p>
       </div>

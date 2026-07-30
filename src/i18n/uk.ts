@@ -106,6 +106,7 @@ export const uk: Record<keyof typeof ru, string> = {
   menu: "МЕНЮ",
   navHome: "Головна",
   navMods: "Моди та збірки",
+  navClaudePacks: "Claude збірки",
   navServers: "Сервери",
   navAccounts: "Акаунти",
   navSettings: "Налаштування",

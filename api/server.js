@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { customAlphabet } from "nanoid";
 import { randomUUID } from "node:crypto";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,7 +36,8 @@ function loadEnvFile(path) {
 loadEnvFile(join(__dirname, "..", ".env"));
 loadEnvFile(join(__dirname, ".env"));
 
-const DB_PATH = join(__dirname, "nuvolexlauncher-social.json");
+const DATA_DIR = process.env.NUVOXEL_DATA_DIR?.trim() || __dirname;
+const DB_PATH = join(DATA_DIR, "nuvolexlauncher-social.json");
 const LEGACY_DB_PATHS = [
   join(__dirname, "nuvoxel-social.json"),
   join(__dirname, "nlauncher-social.json"),
@@ -44,6 +45,7 @@ const LEGACY_DB_PATHS = [
 const UPDATES_PATH = join(__dirname, "updates.json");
 const UPDATES_FILES_DIR = join(__dirname, "updates", "files");
 const makeFriendCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
+const makePackCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 10);
 const JWT_SECRET =
   process.env.JWT_SECRET || "nuvoxel-dev-secret-change-in-production";
 const PORT = Number(process.env.PORT || 3847);
@@ -59,7 +61,8 @@ const BAD_WORDS = [
   "сука", "блять", "бля", "хуй", "пизд", "єбан", "єбат", "їбат", "нахуй",
   "піздец", "мудак", "залупа", "шлюха", "блядь", "дебіл", "даун", "урод",
   "fuck", "shit", "bitch", "asshole", "dick", "pussy", "nigger", "faggot",
-  "bastard", "whore", "cunt", "damn", "retard", "idiot",
+  "bastard", "whore", "cunt", "damn", "retard", "idiot", "пидорас", "підар", "підарас", "пидор", "ёбаный", "ёбаная", "ёбаный", "ёбаная",
+  "пиз", "підар", "підарас", "хуйло", "пиздобол", "пиздобольск", "піздобол", "піздобол", "їбанат", "їбанатка", "їбанатка", "їбанат"
 ];
 function containsProfanity(text) {
   const lower = text.toLowerCase().replace(/[^a-zа-яіїєґ]/g, "");
@@ -96,6 +99,7 @@ function loadDb() {
       if (existsSync(legacyPath)) {
         try {
           const data = readFileSync(legacyPath, "utf8");
+          mkdirSync(dirname(DB_PATH), { recursive: true });
           writeFileSync(DB_PATH, data, "utf8");
           break;
         } catch {
@@ -105,24 +109,54 @@ function loadDb() {
     }
   }
   if (!existsSync(DB_PATH)) {
-    return { users: {}, friendships: {} };
+    return emptyDb();
   }
   try {
-    return JSON.parse(readFileSync(DB_PATH, "utf8"));
+    return normalizeDb(JSON.parse(readFileSync(DB_PATH, "utf8")));
   } catch {
-    return { users: {}, friendships: {} };
+    return emptyDb();
   }
 }
 
+function emptyDb() {
+  return {
+    users: {},
+    friendships: {},
+    chatMessages: [],
+    violations: [],
+    sharedPacks: [],
+  };
+}
+
+function normalizeDb(data) {
+  const base = emptyDb();
+  if (!data || typeof data !== "object") return base;
+  return {
+    ...base,
+    ...data,
+    users: data.users && typeof data.users === "object" ? data.users : {},
+    friendships:
+      data.friendships && typeof data.friendships === "object"
+        ? data.friendships
+        : {},
+    chatMessages: Array.isArray(data.chatMessages) ? data.chatMessages : [],
+    violations: Array.isArray(data.violations) ? data.violations : [],
+    sharedPacks: Array.isArray(data.sharedPacks) ? data.sharedPacks : [],
+  };
+}
+
 function saveDb(db) {
-  writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+  const tempPath = `${DB_PATH}.${process.pid}.tmp`;
+  writeFileSync(tempPath, JSON.stringify(normalizeDb(db), null, 2), "utf8");
+  renameSync(tempPath, DB_PATH);
 }
 
 let dbChain = Promise.resolve();
 
 function withDb(fn) {
   const job = dbChain.then(fn);
-  dbChain = job.catch(() => {});
+  dbChain = job.catch(() => { });
   return job;
 }
 
@@ -184,7 +218,11 @@ function auth(req, res, next) {
     return res.status(401).json({ error: "UNAUTHORIZED" });
   }
   try {
-    req.auth = jwt.verify(header.slice(7), JWT_SECRET);
+    const payload = jwt.verify(header.slice(7), JWT_SECRET);
+    const db = loadDb();
+    const user = db.users[payload.sub];
+    if (!user) return res.status(401).json({ error: "UNAUTHORIZED" });
+    req.auth = { ...payload, role: user.role || "user" };
     next();
   } catch {
     return res.status(401).json({ error: "UNAUTHORIZED" });
@@ -567,8 +605,8 @@ app.post("/chat/send", auth, (req, res) => {
       flagged: hasProfanity,
     };
     db.chatMessages.push(msg);
-    if (db.chatMessages.length > MAX_CHAT_HISTORY * 3) {
-      db.chatMessages = db.chatMessages.slice(-MAX_CHAT_HISTORY);
+    if (db.chatMessages.length > MAX_CHAT_HISTORY * 10) {
+      db.chatMessages = db.chatMessages.slice(-MAX_CHAT_HISTORY * 10);
     }
     saveDb(db);
     return msg;
@@ -583,7 +621,7 @@ app.get("/chat/global", (_req, res) => {
     const db = loadDb();
     const msgs = (db.chatMessages || [])
       .filter((m) => m.channel === "global")
-      .slice(-100);
+      .slice(-MAX_CHAT_HISTORY);
     return msgs;
   })
     .then((payload) => res.json(payload))
@@ -599,8 +637,8 @@ app.get("/chat/dm/:otherUserId", auth, (req, res) => {
     const msgs = (db.chatMessages || [])
       .filter((m) => m.channel === "dm" &&
         ((m.userId === myId && m.recipientId === otherId) ||
-         (m.userId === otherId && m.recipientId === myId)))
-      .slice(-100);
+          (m.userId === otherId && m.recipientId === myId)))
+      .slice(-MAX_CHAT_HISTORY);
     return msgs;
   })
     .then((payload) => res.json(payload))
@@ -722,11 +760,165 @@ app.post("/admin/violations/resolve", auth, adminAuth, (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+function uniquePackCode(db) {
+  for (let index = 0; index < 40; index += 1) {
+    const code = makePackCode();
+    if (!db.sharedPacks.some((pack) => pack.code === code)) return code;
+  }
+  throw new ApiError(500, "SERVER_ERROR");
+}
+
+function normalizeSharedPack(input) {
+  const name = String(input?.name ?? "").trim();
+  const description = String(input?.description ?? "").trim().slice(0, 400);
+  const minecraftVersion = String(input?.minecraftVersion ?? "").trim();
+  const loader = String(input?.loader ?? "").trim().toLowerCase();
+  const sourceMods = Array.isArray(input?.mods) ? input.mods : [];
+
+  if (!name || name.length > 64) throw new ApiError(400, "INVALID_PACK");
+  if (!/^\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?$/.test(minecraftVersion)) {
+    throw new ApiError(400, "INVALID_PACK");
+  }
+  if (!["vanilla", "fabric", "forge", "quilt", "neoforge"].includes(loader)) {
+    throw new ApiError(400, "INVALID_PACK");
+  }
+  if (sourceMods.length > 250) throw new ApiError(400, "INVALID_PACK");
+
+  const mods = sourceMods.map((mod) => {
+    const projectId = String(mod?.projectId ?? "").trim();
+    const versionId = String(mod?.versionId ?? "").trim();
+    const source = mod?.catalogSource === "curseforge" ? "curseforge" : "modrinth";
+    if (!projectId || projectId.length > 120 || !versionId || versionId.length > 160) {
+      throw new ApiError(400, "INVALID_PACK");
+    }
+    return {
+      projectId,
+      versionId,
+      name: String(mod?.name ?? projectId).trim().slice(0, 100) || projectId,
+      author: String(mod?.author ?? "Unknown").trim().slice(0, 100) || "Unknown",
+      iconUrl: typeof mod?.iconUrl === "string" ? mod.iconUrl.slice(0, 500) : null,
+      catalogSource: source,
+    };
+  });
+
+  return { name, description, minecraftVersion, loader, mods };
+}
+
+function sharedPackSummary(pack, includeMods = false) {
+  const summary = {
+    id: pack.id,
+    code: pack.code,
+    name: pack.name,
+    description: pack.description || "",
+    minecraftVersion: pack.minecraftVersion,
+    loader: pack.loader,
+    modCount: pack.mods?.length ?? 0,
+    authorId: pack.authorId,
+    authorUsername: pack.authorUsername,
+    status: pack.status,
+    createdAt: pack.createdAt,
+    reviewedAt: pack.reviewedAt ?? null,
+    reviewReason: pack.reviewReason ?? null,
+  };
+  return includeMods ? { ...summary, mods: pack.mods ?? [] } : summary;
+}
+
+app.post("/claude/packs", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const user = db.users[req.auth.sub];
+    if (!user) throw new ApiError(401, "UNAUTHORIZED");
+    if (isUserBanned(user)) throw new ApiError(403, "USER_BANNED");
+
+    const pack = normalizeSharedPack(req.body);
+    const record = {
+      id: randomUUID(),
+      code: uniquePackCode(db),
+      ...pack,
+      authorId: user.id,
+      authorUsername: user.username,
+      status: "pending",
+      createdAt: Date.now(),
+      reviewedAt: null,
+      reviewReason: null,
+    };
+    db.sharedPacks.push(record);
+    saveDb(db);
+    return sharedPackSummary(record, true);
+  })
+    .then((payload) => res.status(201).json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.get("/claude/packs", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return db.sharedPacks
+      .filter((pack) => pack.status === "approved" || pack.authorId === req.auth.sub)
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .map((pack) => sharedPackSummary(pack));
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/claude/packs/import", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const code = String(req.body?.code ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    const pack = db.sharedPacks.find((item) => item.code === code);
+    if (!pack) throw new ApiError(404, "PACK_NOT_FOUND");
+    if (pack.status !== "approved") {
+      throw new ApiError(403, pack.status === "blocked" ? "PACK_BLOCKED" : "PACK_PENDING");
+    }
+    return sharedPackSummary(pack, true);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.get("/admin/claude/packs", auth, adminAuth, (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return db.sharedPacks
+      .slice()
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .map((pack) => sharedPackSummary(pack, true));
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/admin/claude/packs/review", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const pack = db.sharedPacks.find((item) => item.id === req.body?.packId);
+    const status = req.body?.status;
+    const reason = String(req.body?.reason ?? "").trim().slice(0, 400);
+    if (!pack) throw new ApiError(404, "PACK_NOT_FOUND");
+    if (status !== "approved" && status !== "blocked") {
+      throw new ApiError(400, "INVALID_PACK_REVIEW");
+    }
+    if (status === "blocked" && !reason) throw new ApiError(400, "REVIEW_REASON_REQUIRED");
+    pack.status = status;
+    pack.reviewReason = reason || null;
+    pack.reviewedAt = Date.now();
+    pack.reviewedBy = req.auth.sub;
+    saveDb(db);
+    return sharedPackSummary(pack, true);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
   // SPA fallback — serve index.html for all non-API routes
-  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health", "/chat/", "/users"];
+  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health", "/chat/", "/claude/", "/users"];
   app.get("*", (req, res, next) => {
     if (API_PREFIXES.some((p) => req.path.startsWith(p))) {
       return next();

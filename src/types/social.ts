@@ -31,6 +31,34 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type SharedPackStatus = "pending" | "approved" | "blocked";
+
+export interface SharedPackMod {
+  projectId: string;
+  versionId: string;
+  name: string;
+  author: string;
+  iconUrl: string | null;
+  catalogSource: "modrinth" | "curseforge";
+}
+
+export interface SharedPack {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  minecraftVersion: string;
+  loader: "vanilla" | "fabric" | "forge" | "quilt" | "neoforge";
+  modCount: number;
+  authorId: string;
+  authorUsername: string;
+  status: SharedPackStatus;
+  createdAt: number;
+  reviewedAt: number | null;
+  reviewReason: string | null;
+  mods?: SharedPackMod[];
+}
+
 export type SocialApiErrorCode =
   | "UNAUTHORIZED"
   | "INVALID_USERNAME"
@@ -41,6 +69,15 @@ export type SocialApiErrorCode =
   | "NOT_FOUND"
   | "SELF_ADD"
   | "ALREADY_FRIENDS"
+  | "USER_BANNED"
+  | "USER_MUTED"
+  | "EMPTY_MESSAGE"
+  | "INVALID_PACK"
+  | "PACK_NOT_FOUND"
+  | "PACK_BLOCKED"
+  | "PACK_PENDING"
+  | "INVALID_PACK_REVIEW"
+  | "REVIEW_REASON_REQUIRED"
   | "NETWORK"
   | "SERVER_ERROR";
 

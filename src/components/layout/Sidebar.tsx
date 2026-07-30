@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, Layers, Server, Settings, User } from "lucide-react";
+import { Home, Layers, Server, Settings, Sparkles, User } from "lucide-react";
 import { t } from "../../i18n";
 import { useAppStore } from "../../store/useAppStore";
 import { useComfortableLayout } from "../../hooks/useComfortableLayout";
@@ -8,6 +8,7 @@ import { SHIMMER_SURFACE } from "../../utils/shimmer";
 const navItems = [
   { to: "/", icon: Home, labelKey: "navHome" as const },
   { to: "/mods", icon: Layers, labelKey: "navMods" as const },
+  { to: "/claude-packs", icon: Sparkles, labelKey: "navClaudePacks" as const },
   { to: "/servers", icon: Server, labelKey: "navServers" as const },
   { to: "/accounts", icon: User, labelKey: "navAccounts" as const },
   { to: "/settings", icon: Settings, labelKey: "navSettings" as const },

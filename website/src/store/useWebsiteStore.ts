@@ -51,6 +51,7 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       const session: WebAuthSession = {
         email: data.user?.email || `${data.user?.username}@nuvoxel.net`,
         username: data.user?.username || loginInput,
+        friendCode: data.user?.friendCode,
         loggedIn: true,
         role: data.user?.role || "user",
         token: data.token,
@@ -77,6 +78,7 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       const session: WebAuthSession = {
         email: data.user?.email || email || `${username}@nuvoxel.net`,
         username: data.user?.username || username,
+        friendCode: data.user?.friendCode,
         loggedIn: true,
         role: data.user?.role || "user",
         token: data.token,

@@ -46,6 +46,7 @@ export interface SelectedSkin {
 export interface WebAuthSession {
   email: string;
   username: string;
+  friendCode?: string;
   loggedIn: boolean;
   role?: "admin" | "user";
   token?: string;

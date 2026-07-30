@@ -3,6 +3,8 @@ import type {
   FriendProfile,
   NuvoxelSession,
   NuvoxelUser,
+  SharedPack,
+  SharedPackMod,
   SocialApiErrorCode,
 } from "../types/social";
 import { SocialApiError } from "../types/social";
@@ -170,6 +172,38 @@ export async function fetchUserProfile(
   userId: string,
 ): Promise<FriendProfile> {
   return request<FriendProfile>(`/users/${userId}`);
+}
+
+export async function publishSharedPack(
+  token: string,
+  input: {
+    name: string;
+    description?: string;
+    minecraftVersion: string;
+    loader: string;
+    mods: SharedPackMod[];
+  },
+): Promise<SharedPack> {
+  return request<SharedPack>("/claude/packs", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchSharedPacks(token: string): Promise<SharedPack[]> {
+  return request<SharedPack[]>("/claude/packs", { token });
+}
+
+export async function importSharedPack(
+  token: string,
+  code: string,
+): Promise<SharedPack> {
+  return request<SharedPack>("/claude/packs/import", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ code }),
+  });
 }
 
 export function sessionFromAuth(
