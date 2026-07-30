@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Download, Globe, LogOut, User, Shield } from "lucide-react";
+import { Download, Globe, LogOut, Shield } from "lucide-react";
 import { useEffect } from "react";
 import { AUTH_CHANGE_EVENT, SKIN_CHANGE_EVENT } from "@shared/skins";
 import { useWebsiteStore } from "../store/useWebsiteStore";
@@ -71,33 +71,18 @@ export function SiteLayout() {
               </NavLink>
             ))}
             {auth?.loggedIn && (
-              <>
-                <NavLink
-                  to="/profile"
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-2 text-sm transition font-medium flex items-center gap-1.5 ${
-                      isActive
-                        ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
-                        : "text-zinc-400 hover:text-white"
-                    }`
-                  }
-                >
-                  <User className="h-4 w-4" />
-                  Профіль
-                </NavLink>
-                <NavLink
-                  to="/skins"
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-2 text-sm transition ${
-                      isActive
-                        ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
-                        : "text-zinc-400 hover:text-white"
-                    }`
-                  }
-                >
-                  {t("navSkins")}
-                </NavLink>
-              </>
+              <NavLink
+                to="/skins"
+                className={({ isActive }) =>
+                  `rounded-lg px-3 py-2 text-sm transition ${
+                    isActive
+                      ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)]"
+                      : "text-zinc-400 hover:text-white"
+                  }`
+                }
+              >
+                {t("navSkins")}
+              </NavLink>
             )}
             {isAdmin && (
               <NavLink
@@ -142,10 +127,11 @@ export function SiteLayout() {
             {auth?.loggedIn ? (
               <div className="flex items-center gap-2">
                 <Link
-                  to={isAdmin ? "/admin" : "/profile"}
-                  className="btn-outline hidden px-3 py-2 text-sm sm:inline-flex items-center gap-1.5"
+                  to="/admin"
+                  className="btn-outline hidden px-3 py-2 text-sm sm:inline-flex items-center gap-1.5 border-purple-500/30 hover:border-purple-500/60"
+                  title="Відкрити адмінку"
                 >
-                  {isAdmin ? <Shield className="h-4 w-4 text-purple-400" /> : <User className="h-4 w-4 text-[var(--nl-green)]" />}
+                  <Shield className="h-4 w-4 text-purple-400" />
                   {auth.username}
                 </Link>
                 <button
