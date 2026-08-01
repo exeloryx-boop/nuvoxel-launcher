@@ -48,8 +48,6 @@ import { getHomeBackgroundStyle } from "../utils/homeBackgrounds";
 import { maskPrivateText } from "../utils/privacyMask";
 import { useComfortableLayout } from "../hooks/useComfortableLayout";
 import { SHIMMER_SURFACE } from "../utils/shimmer";
-import { SystemDetectionBanner } from "../components/home/SystemDetectionBanner";
-import { SystemDiagnosticsWidget } from "../components/home/SystemDiagnosticsWidget";
 import { VoxelCanvas } from "../components/home/VoxelCanvas";
 
 
@@ -284,10 +282,6 @@ export function HomePage() {
         ) : null}
 
         <ActiveServerBanner />
-
-        <SystemDetectionBanner />
-
-        <SystemDiagnosticsWidget />
 
         <div className={`shrink-0 ${comfortable ? "mb-5" : "mb-3"}`}>
 
