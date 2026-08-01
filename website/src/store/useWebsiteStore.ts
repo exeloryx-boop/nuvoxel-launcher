@@ -48,7 +48,7 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       const res = await fetch(`${getApiBase()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: loginInput, password }),
+        body: JSON.stringify({ login: loginInput.trim(), password: password.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {

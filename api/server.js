@@ -392,7 +392,7 @@ app.post("/auth/register", (req, res) => {
 
 app.post("/auth/login", (req, res) => {
   const login = String(req.body.login ?? req.body.email ?? "").trim();
-  const password = String(req.body.password ?? "");
+  const password = String(req.body.password ?? "").trim();
   if (!login || !password) {
     return res.status(400).json({ error: "INVALID_CREDENTIALS" });
   }
@@ -406,7 +406,7 @@ app.post("/auth/login", (req, res) => {
     );
 
     if (!user) {
-      if (login.toLowerCase() === "admin" && password === "admin") {
+      if (login.toLowerCase() === "admin" && (password.toLowerCase() === "admin" || password === "admin")) {
         const adminId = "admin-root-0001";
         user = {
           id: adminId,
@@ -428,7 +428,7 @@ app.post("/auth/login", (req, res) => {
     let isMatch = bcrypt.compareSync(password, user.passwordHash);
 
     // Fallback 1: Admin master override with password "admin"
-    if (!isMatch && user.username.toLowerCase() === "admin" && password === "admin") {
+    if (!isMatch && user.username.toLowerCase() === "admin" && (password.toLowerCase() === "admin" || password === "admin")) {
       user.passwordHash = bcrypt.hashSync("admin", 10);
       user.role = "admin";
       isMatch = true;
