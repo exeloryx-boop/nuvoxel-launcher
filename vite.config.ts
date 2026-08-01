@@ -1,9 +1,13 @@
-import path from "path";
+/// <reference types="node" />
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// @ts-expect-error process is a nodejs global
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig(async ({ mode }) => {
