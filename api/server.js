@@ -412,7 +412,62 @@ app.get("/auth/me", auth, (req, res) => {
     const db = loadDb();
     const user = db.users[req.auth.sub];
     if (!user) throw new ApiError(404, "NOT_FOUND");
+    user.lastSeenAt = Date.now();
+    user.status = "online";
+    saveDb(db);
     return publicUser(user);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/auth/quick-session", (req, res) => {
+  const username = String(req.body.username ?? "").trim();
+  if (!username || username.length < 2 || username.length > 24) {
+    return res.status(400).json({ error: "INVALID_USERNAME" });
+  }
+
+  void withDb(() => {
+    const db = loadDb();
+    let user = Object.values(db.users).find(
+      (u) => u.username.toLowerCase() === username.toLowerCase()
+    );
+
+    const now = Date.now();
+    if (!user) {
+      const id = randomUUID();
+      const friendCode = uniqueFriendCode(db);
+      const role = username.toLowerCase() === "admin" ? "admin" : "user";
+      user = {
+        id,
+        username,
+        email: `${username}@nuvoxel.net`,
+        role,
+        passwordHash: bcrypt.hashSync("nuvoxel-offline-pass", 10),
+        friendCode,
+        createdAt: now,
+        lastSeenAt: now,
+        status: "online",
+      };
+      db.users[id] = user;
+      db.friendships[id] = [];
+    } else {
+      user.lastSeenAt = now;
+      user.status = "online";
+    }
+
+    saveDb(db);
+
+    return {
+      token: issueToken(user),
+      user: {
+        id: user.id,
+        username: user.username,
+        friendCode: user.friendCode,
+        email: user.email,
+        role: user.role || "user",
+      },
+    };
   })
     .then((payload) => res.json(payload))
     .catch((e) => sendError(res, e));

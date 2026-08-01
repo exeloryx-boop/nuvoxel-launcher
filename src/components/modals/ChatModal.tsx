@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Send, Globe, MessageSquare } from "lucide-react";
 import { ChatMessage, FriendProfile } from "../../types/social";
-import { fetchGlobalChat, fetchDMChat, handleSocialApiError, sendChatMessage } from "../../services/nuvoxelApi";
+import { fetchGlobalChat, fetchDMChat, getOrCreateQuickSession, handleSocialApiError, sendChatMessage } from "../../services/nuvoxelApi";
 import { SocialApiError } from "../../types/social";
 import { useAppStore } from "../../store/useAppStore";
 import { UserProfileModal } from "./UserProfileModal";
@@ -52,7 +52,26 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || !session || sending) return;
+    if (!text.trim() || sending) return;
+
+    const accounts = useAppStore.getState().accounts;
+    const activeAccountId = useAppStore.getState().activeAccountId;
+    const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+
+    let currentSession = session;
+    if (!currentSession && activeAccount?.username) {
+      try {
+        currentSession = await getOrCreateQuickSession(activeAccount.username);
+        useAppStore.setState({ nuvoxelSession: currentSession });
+      } catch {
+        /* failed to auto-session */
+      }
+    }
+
+    if (!currentSession) {
+      setError("Увійдіть в акаунт, щоб писати в чат.");
+      return;
+    }
 
     setSending(true);
     setError("");
@@ -61,13 +80,30 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
 
     try {
       if (activeTab === "global") {
-        const msg = await sendChatMessage(session.token, content, "global");
+        const msg = await sendChatMessage(currentSession.token, content, "global");
         setMessages((prev) => [...prev, msg]);
       } else if (activeTab === "dm" && selectedFriend) {
-        const msg = await sendChatMessage(session.token, content, "dm", selectedFriend.id);
+        const msg = await sendChatMessage(currentSession.token, content, "dm", selectedFriend.id);
         setMessages((prev) => [...prev, msg]);
       }
     } catch (error) {
+      if (error instanceof SocialApiError && error.code === "UNAUTHORIZED" && activeAccount?.username) {
+        try {
+          const restoredSession = await getOrCreateQuickSession(activeAccount.username);
+          useAppStore.setState({ nuvoxelSession: restoredSession });
+          if (activeTab === "global") {
+            const msg = await sendChatMessage(restoredSession.token, content, "global");
+            setMessages((prev) => [...prev, msg]);
+          } else if (activeTab === "dm" && selectedFriend) {
+            const msg = await sendChatMessage(restoredSession.token, content, "dm", selectedFriend.id);
+            setMessages((prev) => [...prev, msg]);
+          }
+          return;
+        } catch {
+          /* fallback */
+        }
+      }
+
       handleSocialApiError(error);
       if (error instanceof SocialApiError) {
         setError(
@@ -76,7 +112,7 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
             : error.code === "USER_BANNED"
               ? "Ваш акаунт заблоковано."
               : error.code === "UNAUTHORIZED"
-                ? "Сесію завершено. Увійдіть у Nuvoxel ID ще раз."
+                ? "Сесію оновлено. Натисніть надіслати ще раз."
                 : "Повідомлення не надіслано. Спробуйте ще раз.",
         );
       } else {

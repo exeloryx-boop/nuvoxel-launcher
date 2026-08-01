@@ -83,18 +83,32 @@ export function SiteLayout() {
               </NavLink>
             ))}
             {auth?.loggedIn && (
-              <NavLink
-                to="/skins"
-                className={({ isActive }) =>
-                  `rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
-                    isActive
-                      ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)] border border-[var(--nl-green)]/40"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
-                  }`
-                }
-              >
-                {t("navSkins")}
-              </NavLink>
+              <>
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                      isActive
+                        ? "bg-purple-600/80 text-white shadow-md shadow-purple-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`
+                  }
+                >
+                  Профіль
+                </NavLink>
+                <NavLink
+                  to="/skins"
+                  className={({ isActive }) =>
+                    `rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                      isActive
+                        ? "bg-[var(--nl-green)]/20 text-[var(--nl-green)] border border-[var(--nl-green)]/40"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`
+                  }
+                >
+                  {t("navSkins")}
+                </NavLink>
+              </>
             )}
             {isAdmin && (
               <NavLink
@@ -143,13 +157,13 @@ export function SiteLayout() {
             {auth?.loggedIn ? (
               <div className="flex items-center gap-2 pl-2 border-l border-white/10">
                 <Link
-                  to={isAdmin ? "/admin" : "/skins"}
+                  to={isAdmin ? "/admin" : "/profile"}
                   className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition border ${
                     isAdmin
                       ? "border-purple-500/40 bg-purple-500/15 text-purple-200 hover:border-purple-400 shadow-md shadow-purple-500/20"
                       : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:border-emerald-500/60"
                   }`}
-                  title={isAdmin ? "Відкрити панель адміністратора" : "Профіль та скіни"}
+                  title={isAdmin ? "Панель адміністратора" : "Мій Профіль"}
                 >
                   <img
                     src={`https://crafthead.net/avatar/${encodeURIComponent(auth.username)}/24`}

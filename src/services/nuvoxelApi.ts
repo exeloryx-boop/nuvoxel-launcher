@@ -51,6 +51,21 @@ async function request<T>(
   return body as T;
 }
 
+export async function getOrCreateQuickSession(
+  username: string,
+): Promise<NuvoxelSession> {
+  const res = await request<{ token: string; user: NuvoxelUser }>("/auth/quick-session", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+  });
+  return {
+    token: res.token,
+    userId: res.user.id,
+    username: res.user.username,
+    friendCode: res.user.friendCode,
+  };
+}
+
 function isFriendProfile(value: unknown): value is FriendProfile {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
