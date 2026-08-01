@@ -1091,8 +1091,24 @@ app.post("/admin/violations/clear-resolved", auth, adminAuth, (_req, res) => {
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
-  // SPA fallback — serve index.html for all non-API routes
-  const API_PREFIXES = ["/auth/", "/admin/", "/friends", "/presence", "/updates/", "/curseforge", "/health", "/chat/", "/claude/", "/users"];
+  // SPA fallback — serve index.html for all frontend navigation routes
+  const API_PREFIXES = [
+    "/auth/",
+    "/admin/stats",
+    "/admin/users",
+    "/admin/chat",
+    "/admin/violations",
+    "/admin/broadcast",
+    "/admin/claude",
+    "/friends",
+    "/presence",
+    "/updates/",
+    "/curseforge",
+    "/health",
+    "/chat/",
+    "/claude/",
+    "/users/",
+  ];
   app.get("*", (req, res, next) => {
     if (API_PREFIXES.some((p) => req.path.startsWith(p))) {
       return next();
