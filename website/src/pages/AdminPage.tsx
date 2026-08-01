@@ -304,6 +304,25 @@ export function AdminPage() {
     }
   };
 
+  const handleClearResolved = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/admin/violations/clear-resolved`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${auth?.token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setViolations((prev) => prev.filter((v) => !v.resolved));
+        setStatusMsg(`Видалено ${data.cleared} розглядів порушень`);
+      }
+    } catch {
+      setStatusMsg("Помилка очищення");
+    }
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
   const handlePackReview = async (
     packId: string,
     status: "approved" | "blocked",
@@ -840,10 +859,22 @@ export function AdminPage() {
       {tab === "moderation" && (
         <div className="space-y-6 animate-slide-up-fade">
           <div className="glass-card glow-border p-6">
-            <h3 className="flex items-center gap-2 text-lg font-bold mb-4 text-red-400">
-              <AlertTriangle className="h-5 w-5" />
-              Журнал порушень фильтру мату ({violations.length})
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="flex items-center gap-2 text-lg font-bold text-red-400">
+                <AlertTriangle className="h-5 w-5" />
+                Журнал порушень фільтру мату ({violations.length})
+              </h3>
+              {violations.some((v) => v.resolved) && (
+                <button
+                  type="button"
+                  onClick={handleClearResolved}
+                  className="btn-outline btn-micro flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Очистити розглянуті
+                </button>
+              )}
+            </div>
             {violations.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
                 <CheckCircle2 className="h-12 w-12 text-emerald-500/40 mx-auto mb-2" />

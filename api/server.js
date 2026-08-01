@@ -977,6 +977,19 @@ app.post("/admin/broadcast", auth, adminAuth, (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+app.post("/admin/violations/clear-resolved", auth, adminAuth, (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const beforeCount = db.violations.length;
+    db.violations = db.violations.filter((v) => !v.resolved);
+    const cleared = beforeCount - db.violations.length;
+    saveDb(db);
+    return { cleared, remaining: db.violations.length };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));

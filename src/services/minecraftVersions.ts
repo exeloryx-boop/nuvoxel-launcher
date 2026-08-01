@@ -4,7 +4,11 @@ const MANIFEST_URL =
   "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
 const HIGHER_VERSIONS: MinecraftVersionEntry[] = [
+  { id: "1.22.1", type: "release", url: "", time: "2026-08-01T00:00:00+00:00", releaseTime: "2026-08-01T00:00:00+00:00" },
+  { id: "1.22.0", type: "release", url: "", time: "2026-08-01T00:00:00+00:00", releaseTime: "2026-08-01T00:00:00+00:00" },
   { id: "1.22-Snapshot", type: "snapshot", url: "", time: "2026-07-30T00:00:00+00:00", releaseTime: "2026-07-30T00:00:00+00:00" },
+  { id: "1.21.10", type: "release", url: "", time: "2026-07-28T00:00:00+00:00", releaseTime: "2026-07-28T00:00:00+00:00" },
+  { id: "1.21.9", type: "release", url: "", time: "2026-07-27T00:00:00+00:00", releaseTime: "2026-07-27T00:00:00+00:00" },
   { id: "1.21.8", type: "release", url: "", time: "2026-07-25T00:00:00+00:00", releaseTime: "2026-07-25T00:00:00+00:00" },
   { id: "1.21.7", type: "release", url: "", time: "2026-07-15T00:00:00+00:00", releaseTime: "2026-07-15T00:00:00+00:00" },
   { id: "1.21.6", type: "release", url: "", time: "2026-06-20T00:00:00+00:00", releaseTime: "2026-06-20T00:00:00+00:00" },
@@ -68,5 +72,5 @@ export function groupVersionsByType(versions: MinecraftVersionEntry[]) {
 export async function getLatestRelease(): Promise<string> {
   const versions = await fetchMinecraftVersions();
   const latest = versions.find((v) => v.type === "release");
-  return latest?.id ?? "1.21.8";
+  return latest?.id ?? "1.22.1";
 }
