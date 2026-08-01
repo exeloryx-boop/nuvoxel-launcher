@@ -85,7 +85,7 @@ export function SystemDiagnosticsWidget() {
           </div>
           <div>
             <h3 className="font-bold text-sm text-white flex items-center gap-2">
-              Zenith Engine Diagnostics & Booster
+              Nuvoxel Engine Diagnostics & Booster
               <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold">
                 READY
               </span>

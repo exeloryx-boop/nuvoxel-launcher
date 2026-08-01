@@ -1,7 +1,7 @@
 {
   "version": "0.7.0",
-  "title": "Nuvoxel Launcher Zenith Modern Edition",
-  "releaseDate": "2026-08-01T16:06:00.127Z",
+  "title": "Nuvoxel Launcher v0.7.0 Nuvoxel",
+  "releaseDate": "2026-08-01T16:14:32.370Z",
   "mandatory": false,
   "files": {
     "msi": "/updates/files/NuvoxelLauncher-v0.7.0.msi",
