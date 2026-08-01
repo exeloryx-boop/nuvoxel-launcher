@@ -14,7 +14,10 @@ const DEFAULT_API = "https://nuvoxel-launcher.onrender.com";
 
 export function getSocialApiUrl(): string {
   const fromStore = useAppStore.getState().socialApiUrl?.trim();
-  if (fromStore) return fromStore.replace(/\/$/, "");
+  // Ignore stale local dev URLs in store unless explicitly set to a custom remote URL
+  if (fromStore && !fromStore.includes("localhost") && !fromStore.includes("127.0.0.1")) {
+    return fromStore.replace(/\/$/, "");
+  }
   const fromEnv = import.meta.env.VITE_NUVOXEL_API_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
   return DEFAULT_API;

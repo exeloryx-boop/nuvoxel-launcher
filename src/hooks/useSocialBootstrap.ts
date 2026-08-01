@@ -11,6 +11,8 @@ import { useAppStore } from "../store/useAppStore";
 export function useSocialBootstrap() {
   const session = useAppStore((s) => s.nuvoxelSession);
   const socialApiUrl = useAppStore((s) => s.socialApiUrl);
+  const activeAccountId = useAppStore((s) => s.activeAccountId);
+  const accounts = useAppStore((s) => s.accounts);
   const refreshFriends = useAppStore((s) => s.refreshFriends);
   const setSocialApiOnline = useAppStore((s) => s.setSocialApiOnline);
 
@@ -23,8 +25,8 @@ export function useSocialBootstrap() {
 
   useEffect(() => {
     const activeAccount =
-      useAppStore.getState().accounts.find((a) => a.id === useAppStore.getState().activeAccountId) ||
-      useAppStore.getState().accounts[0];
+      accounts.find((a) => a.id === activeAccountId) ||
+      accounts[0];
 
     void (async () => {
       if (session?.token) {
@@ -57,5 +59,5 @@ export function useSocialBootstrap() {
         }
       }
     })();
-  }, [session?.token, socialApiUrl, refreshFriends]);
+  }, [session?.token, socialApiUrl, activeAccountId, accounts, refreshFriends]);
 }
