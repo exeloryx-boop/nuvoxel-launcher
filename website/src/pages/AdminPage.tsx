@@ -20,6 +20,9 @@ import {
   ShieldAlert,
   Sparkles,
   X,
+  Radio,
+  Download,
+  Megaphone,
 } from "lucide-react";
 import { useWebsiteStore } from "../store/useWebsiteStore";
 
@@ -116,6 +119,62 @@ export function AdminPage() {
   const [muteDuration, setMuteDuration] = useState<number>(30);
   const [modReason, setModReason] = useState("");
 
+  // Broadcast console state
+  const [broadcastText, setBroadcastText] = useState("");
+  const [broadcastType, setBroadcastType] = useState<"info" | "warning" | "alert">("info");
+  const [broadcastActive, setBroadcastActive] = useState(false);
+
+  const fetchBroadcast = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/broadcast`);
+      if (res.ok) {
+        const data = await res.json();
+        setBroadcastText(data.text || "");
+        setBroadcastType(data.type || "info");
+        setBroadcastActive(Boolean(data.active));
+      }
+    } catch (e) {
+      console.error("Broadcast fetch error", e);
+    }
+  };
+
+  const handleSaveBroadcast = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/admin/broadcast`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`,
+        },
+        body: JSON.stringify({
+          text: broadcastText,
+          type: broadcastType,
+          active: broadcastActive,
+        }),
+      });
+      if (res.ok) {
+        setStatusMsg("📢 Глобальне оголошення оновлено!");
+      } else {
+        setStatusMsg("Помилка збереження оголошення");
+      }
+    } catch {
+      setStatusMsg("Помилка мережі");
+    }
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
+  const handleExportUsersJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(users, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `nuvoxel_users_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    setStatusMsg("📥 Базу користувачів успішно завантажено!");
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -136,6 +195,7 @@ export function AdminPage() {
       if (chatRes.ok) setChatMessages(await chatRes.json());
       if (violRes.ok) setViolations(await violRes.json());
       if (packsRes.ok) setSharedPacks(await packsRes.json());
+      await fetchBroadcast();
     } catch (e) {
       console.error("Admin fetch error:", e);
     } finally {
@@ -397,6 +457,55 @@ export function AdminPage() {
             </div>
           )}
 
+          {/* Global Broadcast Announcement Console */}
+          <div className="glass-card glow-border p-6 bg-gradient-to-r from-purple-950/20 via-black/40 to-emerald-950/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Megaphone className="h-6 w-6 text-purple-400 animate-pulse" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">Глобальне Оголошення Сервера</h3>
+                  <p className="text-xs text-zinc-400">Повідомлення буде відображатися всім гравцям у веб-сайті та лаунчері</p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={broadcastActive}
+                  onChange={(e) => setBroadcastActive(e.target.checked)}
+                  className="rounded border-white/20 bg-black/40 h-4 w-4 text-purple-500 focus:ring-purple-500"
+                />
+                <span className="text-xs font-semibold text-purple-300">Опублікувати</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
+              <input
+                type="text"
+                value={broadcastText}
+                onChange={(e) => setBroadcastText(e.target.value)}
+                placeholder="Текст оголошення (напр., 🔥 Оновлення v0.7.0 завантажено!)..."
+                className="sm:col-span-3 rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-sm text-white outline-none focus:border-purple-500"
+              />
+              <select
+                value={broadcastType}
+                onChange={(e) => setBroadcastType(e.target.value as any)}
+                className="rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm text-zinc-300 outline-none"
+              >
+                <option value="info">ℹ️ Інформація</option>
+                <option value="warning">⚡ Попередження</option>
+                <option value="alert">🚨 Критичне</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleSaveBroadcast}
+              className="btn-primary btn-micro flex items-center gap-2 px-5 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-600/30"
+            >
+              <Radio className="h-4 w-4" />
+              Зберегти та Опублікувати
+            </button>
+          </div>
+
           {/* Quick Chat Activity Preview */}
           <div className="glass-card glow-border p-6">
             <div className="flex items-center justify-between mb-4">
@@ -483,6 +592,14 @@ export function AdminPage() {
                 <option value="admin">Адміністратори</option>
                 <option value="user">Гравці</option>
               </select>
+              <button
+                onClick={handleExportUsersJson}
+                className="btn-outline btn-micro flex items-center gap-2 px-3 py-2 text-xs font-semibold border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                title="Завантажити JSON файл бази"
+              >
+                <Download className="h-4 w-4" />
+                Експорт DB
+              </button>
             </div>
           </div>
 

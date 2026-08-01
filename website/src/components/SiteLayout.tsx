@@ -84,21 +84,6 @@ export function SiteLayout() {
                 {t("navSkins")}
               </NavLink>
             )}
-            {isAdmin && (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `rounded-lg px-3 py-2 text-sm font-semibold transition flex items-center gap-1.5 ${
-                    isActive
-                      ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                      : "text-purple-400 hover:bg-purple-500/10"
-                  }`
-                }
-              >
-                <Shield className="h-4 w-4" />
-                Адмінка
-              </NavLink>
-            )}
           </nav>
 
           <div className="flex items-center gap-2">
@@ -127,12 +112,16 @@ export function SiteLayout() {
             {auth?.loggedIn ? (
               <div className="flex items-center gap-2">
                 <Link
-                  to="/admin"
-                  className="btn-outline hidden px-3 py-2 text-sm sm:inline-flex items-center gap-1.5 border-purple-500/30 hover:border-purple-500/60"
-                  title="Відкрити адмінку"
+                  to={isAdmin ? "/admin" : "/skins"}
+                  className={`btn-outline hidden px-3.5 py-2 text-sm sm:inline-flex items-center gap-2 font-semibold transition rounded-xl ${
+                    isAdmin
+                      ? "border-purple-500/40 bg-purple-500/15 text-purple-200 hover:border-purple-400 shadow-lg shadow-purple-500/20"
+                      : "border-emerald-500/30 text-emerald-300 hover:border-emerald-500/60"
+                  }`}
+                  title={isAdmin ? "Відкрити Адмінку" : "Скіни"}
                 >
-                  <Shield className="h-4 w-4 text-purple-400" />
-                  {auth.username}
+                  <Shield className="h-4 w-4 text-purple-400 animate-pulse" />
+                  <span>{auth.username}</span>
                 </Link>
                 <button
                   type="button"

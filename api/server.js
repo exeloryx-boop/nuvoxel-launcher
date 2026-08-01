@@ -947,6 +947,36 @@ app.post("/admin/claude/packs/review", auth, adminAuth, (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+app.get("/broadcast", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return db.broadcast || { text: "", type: "info", active: false, updatedAt: 0 };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+app.post("/admin/broadcast", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const text = String(req.body?.text ?? "").trim();
+    const type = ["info", "warning", "alert"].includes(req.body?.type) ? req.body.type : "info";
+    const active = Boolean(req.body?.active);
+
+    db.broadcast = {
+      text,
+      type,
+      active,
+      updatedAt: Date.now(),
+      updatedBy: req.auth.sub,
+    };
+    saveDb(db);
+    return db.broadcast;
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
