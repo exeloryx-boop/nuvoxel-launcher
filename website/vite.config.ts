@@ -22,5 +22,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(process.cwd(), "api/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom", "zustand"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
   },
 });

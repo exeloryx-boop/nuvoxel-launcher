@@ -11,10 +11,16 @@ import {
 
 const getApiBase = () => {
   if (typeof window !== "undefined" && window.location.origin) {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "https://nuvoxel-launcher.onrender.com";
+    const hostname = window.location.hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      if (window.location.port === "3847") {
+        return window.location.origin;
+      }
+      return "http://127.0.0.1:3847";
     }
-    return window.location.origin;
+    if (!window.location.origin.includes("github.io")) {
+      return window.location.origin;
+    }
   }
   return "https://nuvoxel-launcher.onrender.com";
 };

@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import {
   checkSocialApiHealth,
   fetchMe,
+  getOrCreateQuickSession,
   handleSocialApiError,
 } from "../services/nuvoxelApi";
+import { SocialApiError } from "../types/social";
 import { useAppStore } from "../store/useAppStore";
 
 export function useSocialBootstrap() {
@@ -20,15 +22,38 @@ export function useSocialBootstrap() {
   }, [socialApiUrl, setSocialApiOnline]);
 
   useEffect(() => {
-    if (!session) return;
+    const activeAccount =
+      useAppStore.getState().accounts.find((a) => a.id === useAppStore.getState().activeAccountId) ||
+      useAppStore.getState().accounts[0];
 
     void (async () => {
-      try {
-        await fetchMe(session.token);
-        await refreshFriends();
-      } catch (e) {
-        if (!handleSocialApiError(e)) {
-          useAppStore.setState({ socialApiOnline: false, friends: [] });
+      if (session?.token) {
+        try {
+          await fetchMe(session.token);
+          await refreshFriends();
+          return;
+        } catch (e) {
+          if (e instanceof SocialApiError && e.code === "UNAUTHORIZED" && activeAccount?.username) {
+            try {
+              const restored = await getOrCreateQuickSession(activeAccount.username);
+              useAppStore.setState({ nuvoxelSession: restored });
+              await refreshFriends();
+              return;
+            } catch {
+              /* ignore fallback */
+            }
+          }
+          if (!handleSocialApiError(e)) {
+            useAppStore.setState({ socialApiOnline: false, friends: [] });
+          }
+        }
+      } else if (activeAccount?.username) {
+        try {
+          const newSession = await getOrCreateQuickSession(activeAccount.username);
+          useAppStore.setState({ nuvoxelSession: newSession });
+          await refreshFriends();
+        } catch {
+          /* offline or error */
         }
       }
     })();

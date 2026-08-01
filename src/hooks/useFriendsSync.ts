@@ -38,7 +38,7 @@ export function useFriendsSync() {
     };
 
     const sync = async () => {
-      const currentSession = session || (await restoreSessionIfNeeded());
+      let currentSession = session || (await restoreSessionIfNeeded());
       if (!currentSession) {
         if (!cancelled) {
           useAppStore.setState({ friends: [], socialApiOnline: false });
@@ -56,9 +56,11 @@ export function useFriendsSync() {
         if (activeAccount?.username) {
           try {
             const restored = await getOrCreateQuickSession(activeAccount.username);
+            currentSession = restored;
             if (!cancelled) {
               useAppStore.setState({ nuvoxelSession: restored });
             }
+            await sendPresence(restored.token, status);
           } catch {
             handleSocialApiError(e);
           }
@@ -73,6 +75,18 @@ export function useFriendsSync() {
           useAppStore.setState({ friends, socialApiOnline: true });
         }
       } catch (e) {
+        if (activeAccount?.username) {
+          try {
+            const restored = await getOrCreateQuickSession(activeAccount.username);
+            const friends = await fetchFriends(restored.token);
+            if (!cancelled) {
+              useAppStore.setState({ nuvoxelSession: restored, friends, socialApiOnline: true });
+            }
+            return;
+          } catch {
+            /* ignore retry failure */
+          }
+        }
         if (!cancelled) {
           useAppStore.setState({ friends: [], socialApiOnline: false });
         }

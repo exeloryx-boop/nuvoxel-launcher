@@ -1,0 +1,19 @@
+{
+  "version": "0.7.0",
+  "title": "Nuvoxel Launcher v0.7.0 Nuvoxel",
+  "releaseDate": "2026-08-01T16:14:32.370Z",
+  "mandatory": false,
+  "files": {
+    "msi": "/updates/files/NuvoxelLauncher-v0.7.0.msi",
+    "exe": "/updates/files/NuvoxelLauncher-v0.7.0.exe",
+    "zip": "/updates/files/NuvoxelLauncher-v0.7.0.zip",
+    "jar": "/updates/files/NuvoxelLauncher-v0.7.0.jar"
+  },
+  "changelog": [
+    "Підтримка версій Minecraft 1.0 - 26.2",
+    "Оптимізація JVM (G1GC Memory Booster)",
+    "Імпорт збірок Claude та аналітика системи",
+    "Єдиний акаунт для сайту та лаунчера",
+    "Збереження соціального чату та друзів"
+  ]
+}

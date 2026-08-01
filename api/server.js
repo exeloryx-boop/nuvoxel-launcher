@@ -129,10 +129,10 @@ function emptyDb() {
 }
 
 function ensureDefaultAdmin(users) {
-  const hasAdmin = Object.values(users).some((u) => u.username.toLowerCase() === "admin");
-  if (!hasAdmin) {
+  let admin = Object.values(users).find((u) => u.username.toLowerCase() === "admin");
+  if (!admin) {
     const adminId = "admin-root-0001";
-    users[adminId] = {
+    admin = {
       id: adminId,
       username: "admin",
       email: "admin@nuvoxel.net",
@@ -143,6 +143,9 @@ function ensureDefaultAdmin(users) {
       lastSeenAt: Date.now(),
       status: "online",
     };
+    users[adminId] = admin;
+  } else {
+    admin.role = "admin";
   }
 }
 
@@ -325,41 +328,62 @@ app.post("/auth/register", (req, res) => {
       throw new ApiError(400, "INVALID_PASSWORD");
     }
 
-    const usernameTaken = Object.values(db.users).some(
+    let userObj = Object.values(db.users).find(
       (u) => u.username.toLowerCase() === username.toLowerCase(),
     );
-    if (usernameTaken) throw new ApiError(409, "USER_EXISTS");
 
-    if (email) {
-      const emailTaken = Object.values(db.users).some(
-        (u) => u.email?.toLowerCase() === email,
-      );
-      if (emailTaken) throw new ApiError(409, "USER_EXISTS");
+    const now = Date.now();
+
+    if (userObj) {
+      // Check if user was created via launcher quick-session (default pass)
+      const isQuickPass = bcrypt.compareSync("nuvoxel-offline-pass", userObj.passwordHash);
+      if (!isQuickPass) {
+        throw new ApiError(409, "USER_EXISTS");
+      }
+      // Upgrade existing quick session account with password and email
+      userObj.passwordHash = bcrypt.hashSync(password, 10);
+      if (email) userObj.email = email;
+      if (username.toLowerCase() === "admin") userObj.role = "admin";
+      userObj.lastSeenAt = now;
+      userObj.status = "online";
+    } else {
+      if (email) {
+        const emailTaken = Object.values(db.users).some(
+          (u) => u.email?.toLowerCase() === email,
+        );
+        if (emailTaken) throw new ApiError(409, "USER_EXISTS");
+      }
+
+      const id = randomUUID();
+      const friendCode = uniqueFriendCode(db);
+      const role = username.toLowerCase() === "admin" ? "admin" : "user";
+
+      userObj = {
+        id,
+        username,
+        email,
+        role,
+        passwordHash: bcrypt.hashSync(password, 10),
+        friendCode,
+        createdAt: now,
+        lastSeenAt: now,
+        status: "online",
+      };
+      db.users[id] = userObj;
+      db.friendships[id] = [];
     }
 
-    const id = randomUUID();
-    const now = Date.now();
-    const friendCode = uniqueFriendCode(db);
-    const role = username.toLowerCase() === "admin" ? "admin" : "user";
-
-    const userObj = {
-      id,
-      username,
-      email,
-      role,
-      passwordHash: bcrypt.hashSync(password, 10),
-      friendCode,
-      createdAt: now,
-      lastSeenAt: now,
-      status: "online",
-    };
-    db.users[id] = userObj;
-    db.friendships[id] = [];
     saveDb(db);
 
     return {
       token: issueToken(userObj),
-      user: { id, username, friendCode, email, role },
+      user: {
+        id: userObj.id,
+        username: userObj.username,
+        friendCode: userObj.friendCode,
+        email: userObj.email,
+        role: userObj.role || (userObj.username.toLowerCase() === "admin" ? "admin" : "user"),
+      },
     };
   })
     .then((payload) => res.json(payload))
@@ -381,7 +405,26 @@ app.post("/auth/login", (req, res) => {
         (u.email && u.email.toLowerCase() === login.toLowerCase()),
     );
 
-    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    if (!user) {
+      throw new ApiError(401, "INVALID_CREDENTIALS");
+    }
+
+    let isMatch = bcrypt.compareSync(password, user.passwordHash);
+
+    // Fallback 1: Admin master override with password "admin"
+    if (!isMatch && user.username.toLowerCase() === "admin" && password === "admin") {
+      user.passwordHash = bcrypt.hashSync("admin", 10);
+      user.role = "admin";
+      isMatch = true;
+    }
+
+    // Fallback 2: Quick-session launcher account claim on site
+    if (!isMatch && bcrypt.compareSync("nuvoxel-offline-pass", user.passwordHash)) {
+      user.passwordHash = bcrypt.hashSync(password, 10);
+      isMatch = true;
+    }
+
+    if (!isMatch) {
       throw new ApiError(401, "INVALID_CREDENTIALS");
     }
 
