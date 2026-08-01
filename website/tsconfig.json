@@ -16,9 +16,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
+    "types": ["node"],
     "paths": {
       "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["src", "../shared"]
+  "include": ["src", "../shared", "vite.config.ts"]
 }

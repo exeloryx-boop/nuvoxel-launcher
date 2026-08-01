@@ -1,21 +1,18 @@
-/// <reference types="node" />
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const websiteDir = path.resolve(process.cwd(), "website");
 
 export default defineConfig({
-  root: path.resolve(__dirname),
-  publicDir: path.resolve(__dirname, "public"),
+  root: websiteDir,
+  publicDir: path.resolve(websiteDir, "public"),
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@shared": path.resolve(__dirname, "../shared"),
-      "@i18n": path.resolve(__dirname, "../src/i18n"),
+      "@shared": path.resolve(process.cwd(), "shared"),
+      "@i18n": path.resolve(process.cwd(), "src/i18n"),
     },
   },
   server: {
@@ -23,7 +20,7 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    outDir: path.resolve(__dirname, "../api/public"),
+    outDir: path.resolve(process.cwd(), "api/public"),
     emptyOutDir: true,
   },
 });

@@ -1,12 +1,7 @@
-/// <reference types="node" />
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import path from "path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -18,7 +13,7 @@ export default defineConfig(async ({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
-      alias: { "@shared": path.resolve(__dirname, "shared") },
+      alias: { "@shared": path.resolve(process.cwd(), "shared") },
     },
     define: {
       "import.meta.env.VITE_CURSEFORGE_API_KEY": JSON.stringify(curseforgeKey),
