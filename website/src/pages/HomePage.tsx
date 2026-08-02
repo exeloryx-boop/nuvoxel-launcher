@@ -41,7 +41,7 @@ export function HomePage() {
   return (
     <>
       {/* ═══ HERO ═══ */}
-      <section className="relative overflow-hidden min-h-[85vh] flex items-center">
+      <section className="home-hero relative overflow-hidden min-h-[85vh] flex items-center">
         <div className="particles-bg" />
         <div
           className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30"
@@ -49,7 +49,7 @@ export function HomePage() {
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-[#0a0a0f]/70 to-[#0a0a0f]" />
 
-        <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
+        <div className="home-hero-content relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <p className="section-label mb-4 animate-fade-up">{t("homeHeroLabel")}</p>
           <h1 className="max-w-3xl text-4xl font-bold leading-tight sm:text-6xl lg:text-7xl animate-fade-up delay-100">
             {t("homeHeroTitle1")}
@@ -77,7 +77,7 @@ export function HomePage() {
           <p className="mt-6 text-sm text-zinc-500 animate-fade-in delay-500">{t("homeTagline")}</p>
 
           {/* Floating Stats Bar */}
-          <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 animate-fade-up delay-600">
+          <div className="home-stats mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 animate-fade-up delay-600">
             {stats.map((s, i) => (
               <div
                 key={s.label}
