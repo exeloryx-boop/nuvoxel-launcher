@@ -1,3 +1,4 @@
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -51,10 +52,85 @@ pub fn find_java_for_version(
     }
 
     if let Ok(path) = find_java(None) {
-        return Ok(path);
+        let major = java_major_version(&path).unwrap_or(0);
+        if major >= min_major {
+            return Ok(path);
+        }
+        return Err(format!("ERR_JAVA_TOO_OLD:{major}|{min_major}|{mc_version}"));
     }
 
     Err(format!("ERR_JAVA_NOT_FOUND:{min_major}|{mc_version}"))
+}
+
+/// Minecraft 26.x needs Java 25. When it is not installed system-wide, keep a
+/// private runtime in the Nuvoxel profile instead of asking the player to
+/// change their system Java installation.
+pub async fn find_or_install_java_for_version(
+    custom_path: Option<&str>,
+    mc_version: &str,
+    game_dir: &Path,
+) -> Result<PathBuf, String> {
+    match find_java_for_version(custom_path, mc_version) {
+        Ok(path) => return Ok(path),
+        Err(error) if custom_path.map(str::trim).unwrap_or("").is_empty() => {
+            let min_major = min_java_major_for_version(mc_version);
+            if min_major < 25 {
+                return Err(error);
+            }
+        }
+        Err(error) => return Err(error),
+    }
+
+    let min_major = min_java_major_for_version(mc_version);
+    let runtime_dir = game_dir
+        .join(".nuvolexlauncher")
+        .join("runtimes")
+        .join(format!("java-{min_major}"));
+    if let Some(java) = find_java_recursively(&runtime_dir) {
+        if java_major_version(&java).unwrap_or(0) >= min_major {
+            return Ok(java);
+        }
+    }
+
+    let url = format!(
+        "https://api.adoptium.net/v3/binary/latest/{min_major}/ga/windows/x64/jre/hotspot/normal/eclipse"
+    );
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("ERR_JAVA_RUNTIME_DOWNLOAD:{e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("ERR_JAVA_RUNTIME_DOWNLOAD:HTTP {}", response.status()));
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("ERR_JAVA_RUNTIME_DOWNLOAD:{e}"))?;
+
+    std::fs::create_dir_all(&runtime_dir).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
+        .map_err(|e| format!("ERR_JAVA_RUNTIME_ARCHIVE:{e}"))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("ERR_JAVA_RUNTIME_ARCHIVE:{e}"))?;
+        let Some(relative) = entry.enclosed_name().map(PathBuf::from) else {
+            continue;
+        };
+        let output = runtime_dir.join(relative);
+        if entry.is_dir() {
+            std::fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let mut file = std::fs::File::create(&output).map_err(|e| e.to_string())?;
+            std::io::copy(&mut entry, &mut file).map_err(|e| e.to_string())?;
+        }
+    }
+
+    find_java_recursively(&runtime_dir)
+        .filter(|java| java_major_version(java).unwrap_or(0) >= min_major)
+        .ok_or_else(|| format!("ERR_JAVA_NOT_FOUND:{min_major}|{mc_version}"))
 }
 
 pub fn find_java(custom_path: Option<&str>) -> Result<PathBuf, String> {
@@ -138,6 +214,14 @@ fn glob_first(pattern: &str) -> Option<PathBuf> {
 }
 
 pub fn min_java_major_for_version(version: &str) -> u32 {
+    if version
+        .split('.')
+        .next()
+        .and_then(|part| part.parse::<u32>().ok())
+        .is_some_and(|major| major >= 26)
+    {
+        return 25;
+    }
     if !version.starts_with('1') {
         return 21;
     }
@@ -166,4 +250,26 @@ pub fn min_java_major_for_version(version: &str) -> u32 {
         return 8;
     }
     8
+}
+
+fn find_java_recursively(root: &Path) -> Option<PathBuf> {
+    if !root.exists() {
+        return None;
+    }
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("java.exe"))
+            {
+                return Some(path);
+            }
+        }
+    }
+    None
 }

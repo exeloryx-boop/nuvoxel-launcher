@@ -16,7 +16,7 @@ use super::download::{
     extract_natives, forge_bootstrap_classpath_extras, is_forge_bootstrap, legacy_arguments,
     path_for_java, process_arguments, resolve_inherited_version, classpath_for_java, download_file,
 };
-use super::java::find_java_for_version;
+use super::java::{find_java_for_version, find_or_install_java_for_version};
 use super::mod_loaders::resolve_loader_version;
 use super::offline::setup_offline_session;
 
@@ -107,7 +107,12 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
 
     emit(app, "manifest", None, None, None);
 
-    let java = find_java_for_version(opts.java_path.as_deref(), &opts.version)?;
+    let java = find_or_install_java_for_version(
+        opts.java_path.as_deref(),
+        &opts.version,
+        &game_dir,
+    )
+    .await?;
 
     if loader == "forge" || loader == "neoforge" || loader == "optifine" {
         emit(app, "client", None, None, Some(3));
