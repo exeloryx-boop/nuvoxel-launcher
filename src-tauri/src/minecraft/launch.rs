@@ -86,7 +86,16 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
         emit(app, "loader", None, None, None);
     }
 
-    let game_dir = PathBuf::from(&opts.game_dir);
+    // Nuvoxel is a managed client profile.  Give it an isolated game
+    // directory so user-installed mods from the regular `.minecraft/mods`
+    // folder can never make the selected Nuvoxel version incompatible.
+    let game_dir = if opts.nuvoxel_client {
+        PathBuf::from(&opts.game_dir)
+            .join(".nuvoxel")
+            .join(&opts.version)
+    } else {
+        PathBuf::from(&opts.game_dir)
+    };
     fs::create_dir_all(&game_dir)
         .await
         .map_err(|e| e.to_string())?;
