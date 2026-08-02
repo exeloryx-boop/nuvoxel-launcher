@@ -62,9 +62,9 @@ pub fn find_java_for_version(
     Err(format!("ERR_JAVA_NOT_FOUND:{min_major}|{mc_version}"))
 }
 
-/// Minecraft 26.x needs Java 25. When it is not installed system-wide, keep a
-/// private runtime in the Nuvoxel profile instead of asking the player to
-/// change their system Java installation.
+/// Current Minecraft releases need Java 21 or 25. When the required runtime
+/// is not installed system-wide, download it privately instead of asking the
+/// player to change their system Java installation.
 pub async fn find_or_install_java_for_version(
     custom_path: Option<&str>,
     mc_version: &str,
@@ -72,17 +72,21 @@ pub async fn find_or_install_java_for_version(
 ) -> Result<PathBuf, String> {
     match find_java_for_version(custom_path, mc_version) {
         Ok(path) => return Ok(path),
-        Err(error) if custom_path.map(str::trim).unwrap_or("").is_empty() => {
-            let min_major = min_java_major_for_version(mc_version);
-            if min_major < 25 {
-                return Err(error);
-            }
-        }
+        Err(_) if custom_path.map(str::trim).unwrap_or("").is_empty() => {}
         Err(error) => return Err(error),
     }
 
     let min_major = min_java_major_for_version(mc_version);
-    let runtime_dir = game_dir
+    let runtime_root = game_dir
+        .parent()
+        .filter(|parent| {
+            parent
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case(".nuvoxel"))
+        })
+        .and_then(Path::parent)
+        .unwrap_or(game_dir);
+    let runtime_dir = runtime_root
         .join(".nuvolexlauncher")
         .join("runtimes")
         .join(format!("java-{min_major}"));
@@ -272,4 +276,23 @@ fn find_java_recursively(root: &Path) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::min_java_major_for_version;
+
+    #[test]
+    fn nuvoxel_versions_use_the_required_java_release() {
+        for version in [
+            "1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10",
+            "1.21.11",
+        ] {
+            assert_eq!(min_java_major_for_version(version), 21, "{version}");
+        }
+
+        for version in ["26.1", "26.1.1", "26.1.2", "26.2"] {
+            assert_eq!(min_java_major_for_version(version), 25, "{version}");
+        }
+    }
 }
