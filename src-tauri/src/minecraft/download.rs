@@ -425,7 +425,11 @@ pub fn collect_library_paths(
             continue;
         }
 
-        if library_has_maven_classifier(lib) {
+        if lib["name"]
+            .as_str()
+            .map(is_native_maven_classifier)
+            .unwrap_or(false)
+        {
             continue;
         }
 
@@ -509,7 +513,11 @@ pub async fn download_all_libraries(
             downloads.push(entry);
         }
 
-        if library_has_maven_classifier(lib) {
+        if lib["name"]
+            .as_str()
+            .map(is_native_maven_classifier)
+            .unwrap_or(false)
+        {
             continue;
         }
 
@@ -598,7 +606,11 @@ fn missing_runtime_libraries(game_dir: &Path, version_json: &Value) -> Vec<PathB
         if !rule_matches(lib.get("rules"), "windows") {
             continue;
         }
-        if library_has_maven_classifier(lib) {
+        if lib["name"]
+            .as_str()
+            .map(is_native_maven_classifier)
+            .unwrap_or(false)
+        {
             continue;
         }
         let Ok(Some(path)) = library_jar_path(game_dir, lib) else {
@@ -1224,18 +1236,6 @@ fn normalize_library_path(path: &Path) -> PathBuf {
 }
 
 /// Maven coords with a classifier (e.g. `:natives-windows`) are native artifacts — not classpath jars.
-fn library_has_maven_classifier(lib: &Value) -> bool {
-    lib["name"]
-        .as_str()
-        .map(|name| {
-            name.split(':')
-                .nth(3)
-                .map(|classifier| !classifier.is_empty())
-                .unwrap_or(false)
-        })
-        .unwrap_or(false)
-}
-
 fn maven_classifier_name(name: &str) -> Option<&str> {
     name.split(':').nth(3).filter(|c| !c.is_empty())
 }
