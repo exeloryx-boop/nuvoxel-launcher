@@ -14,7 +14,7 @@ use super::download::{
     apply_skin, build_classpath, cleanup_stale_loader_version_jar, download_all_libraries,
     download_assets, download_client, ensure_custom_skin_loader, ensure_vanilla_base,
     extract_natives, forge_bootstrap_classpath_extras, is_forge_bootstrap, legacy_arguments,
-    path_for_java, process_arguments, resolve_inherited_version, classpath_for_java,
+    path_for_java, process_arguments, resolve_inherited_version, classpath_for_java, download_file,
 };
 use super::java::find_java_for_version;
 use super::mod_loaders::resolve_loader_version;
@@ -42,6 +42,9 @@ pub struct LaunchOptions {
     /// `microsoft` = licensed (real Mojang auth); `local` / `nuvoxel` = offline
     pub account_type: Option<String>,
     pub resolution: Option<String>,
+    #[serde(default)]
+    pub nuvoxel_client: bool,
+    pub nuvoxel_client_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -119,6 +122,13 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
     let version_json = resolve_inherited_version(&client, &game_dir, &version_json).await?;
     save_merged_version(&game_dir, &version_id, &version_json).await?;
     cleanup_stale_loader_version_jar(&game_dir, &version_id, &opts.version);
+
+    if opts.nuvoxel_client {
+        if loader != "fabric" && loader != "quilt" {
+            return Err("ERR_NUVOXEL_REQUIRES_FABRIC".into());
+        }
+        ensure_nuvoxel_client(&client, &game_dir, &opts.version, opts.nuvoxel_client_url.as_deref()).await?;
+    }
 
     emit(app, "client", None, None, Some(5));
     let client_jar = download_client(
@@ -205,6 +215,26 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
 
     emit(app, "done", None, None, Some(100));
     Ok(pid)
+}
+
+/// Installs the launcher-owned module into the selected profile, without
+/// touching the user's other Minecraft installations.
+async fn ensure_nuvoxel_client(
+    client: &Client,
+    game_dir: &Path,
+    mc_version: &str,
+    url: Option<&str>,
+) -> Result<(), String> {
+    let url = url.ok_or("ERR_NUVOXEL_CLIENT_UNAVAILABLE")?;
+    if !url.starts_with("https://") && !url.starts_with("http://127.0.0.1:") && !url.starts_with("http://localhost:") {
+        return Err("ERR_NUVOXEL_CLIENT_URL".into());
+    }
+    let mods_dir = game_dir.join("mods");
+    fs::create_dir_all(&mods_dir).await.map_err(|e| e.to_string())?;
+    let filename = format!("nuvoxel-client-{mc_version}.jar");
+    download_file(client, url, &mods_dir.join(filename), None, true)
+        .await
+        .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))
 }
 
 async fn save_merged_version(

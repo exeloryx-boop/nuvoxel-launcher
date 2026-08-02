@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "nuvoxelclient",
+  "version": "${version}",
+  "name": "Nuvoxel Client",
+  "description": "Nuvoxel in-game companion: HUD, quality-of-life controls and account-aware features.",
+  "authors": ["Nuvoxel"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.nuvoxel.client.NuvoxelClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": ">=1.21.4 <=26.2",
+    "java": ">=21"
+  }
+}

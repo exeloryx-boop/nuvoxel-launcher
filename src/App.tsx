@@ -7,6 +7,7 @@ import { AccountsPage } from "./pages/AccountsPage";
 import { ServersPage } from "./pages/ServersPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ClaudePacksPage } from "./pages/ClaudePacksPage";
+import { NuvoxelPage } from "./pages/NuvoxelPage";
 import { useThemeEffect } from "./hooks/useThemeEffect";
 import { useSkinSync } from "./hooks/useSkinSync";
 import { useDevToolsGuard } from "./hooks/useDevToolsGuard";
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="claude-packs" element={<ClaudePacksPage />} />
+        <Route path="nuvoxel" element={<NuvoxelPage />} />
       </Route>
     </Routes>
   );

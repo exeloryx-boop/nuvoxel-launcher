@@ -77,6 +77,9 @@ export type AccountsTab = "cabinet" | "character" | "achievements";
 
 export type NavPage = "home" | "mods" | "servers" | "accounts" | "settings";
 
+/** A Nuvoxel profile is a separate Fabric instance with the Nuvoxel client module. */
+export type ClientMode = "standard" | "nuvoxel";
+
 export const ACCENT_COLORS: Record<
   AccentColor,
   { hex: string; hover: string }

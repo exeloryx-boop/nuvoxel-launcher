@@ -36,6 +36,15 @@ export function translateLaunchProgress(p: LaunchProgressPayload): string {
 export function translateLaunchError(raw: string): string {
   if (raw === "ERR_DESKTOP_ONLY") return t("launchDesktopOnly");
   if (raw === "ERR_MAIN_CLASS") return t("errMainClass");
+  if (raw === "ERR_NUVOXEL_CLIENT_URL") {
+    return "Не вдалося визначити адресу моду Nuvoxel. Перевірте сервер Nuvoxel у налаштуваннях.";
+  }
+  if (raw === "ERR_NUVOXEL_CLIENT_UNAVAILABLE") {
+    return "Мод Nuvoxel ще не опублікований на сервері.";
+  }
+  if (raw.startsWith("ERR_NUVOXEL_CLIENT_DOWNLOAD:")) {
+    return "Не вдалося завантажити мод Nuvoxel. Перевірте підключення до інтернету та повторіть спробу.";
+  }
 
   if (raw.startsWith("ERR_LOG_CREATE:")) {
     const path = raw.slice("ERR_LOG_CREATE:".length);

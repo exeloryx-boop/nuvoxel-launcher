@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, Layers, Server, Settings, Sparkles, User } from "lucide-react";
+import { Home, Layers, Server, Settings, Sparkles, User, ShieldCheck } from "lucide-react";
 import { t } from "../../i18n";
 import { useAppStore } from "../../store/useAppStore";
 import { useComfortableLayout } from "../../hooks/useComfortableLayout";
@@ -8,6 +8,7 @@ import { SHIMMER_SURFACE } from "../../utils/shimmer";
 const navItems = [
   { to: "/", icon: Home, labelKey: "navHome" as const },
   { to: "/mods", icon: Layers, labelKey: "navMods" as const },
+  { to: "/nuvoxel", icon: ShieldCheck, label: "Nuvoxel" },
   { to: "/claude-packs", icon: Sparkles, labelKey: "navClaudePacks" as const },
   { to: "/servers", icon: Server, labelKey: "navServers" as const },
   { to: "/accounts", icon: User, labelKey: "navAccounts" as const },
@@ -36,11 +37,11 @@ export function Sidebar() {
           </p>
         ) : null}
         <nav className="flex flex-col gap-1.5">
-          {navItems.map(({ to, icon: Icon, labelKey }) => (
+          {navItems.map(({ to, icon: Icon, labelKey, label }) => (
             <NavLink
               key={to}
               to={to}
-              title={compact ? t(labelKey) : undefined}
+              title={compact ? (label ?? t(labelKey!)) : undefined}
               className={({ isActive }) =>
                 `no-drag relative group flex items-center gap-3.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   compact ? "justify-center px-2 py-3" : "px-4 py-3"
@@ -67,7 +68,7 @@ export function Sidebar() {
                   />
                   {!compact ? (
                     <span className={`truncate ${isActive ? "font-bold text-white" : ""}`}>
-                      {t(labelKey)}
+                      {label ?? t(labelKey!)}
                     </span>
                   ) : null}
                 </>

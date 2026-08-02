@@ -19,6 +19,10 @@ export interface LaunchOptions {
   /** local | nuvoxel = offline; microsoft = licensed, no authlib bypass */
   accountType?: string;
   resolution?: string;
+  /** Install the official Nuvoxel Fabric module before starting the game. */
+  nuvoxelClient?: boolean;
+  /** URL of the matching Nuvoxel client JAR, supplied by the launcher API. */
+  nuvoxelClientUrl?: string;
 }
 
 export interface LaunchProgress {
@@ -88,6 +92,8 @@ export async function launchMinecraft(
         language: options.language || null,
         account_type: options.accountType ?? "local",
         resolution: options.resolution ?? "windowed",
+        nuvoxel_client: options.nuvoxelClient ?? false,
+        nuvoxel_client_url: options.nuvoxelClientUrl ?? null,
       },
     });
     return pid;

@@ -22,6 +22,7 @@ import type {
   ScrollbarStyle,
   ContentSpacing,
   VersionFilter,
+  ClientMode,
 } from "../types";
 import type { CatalogItem, LaunchHistoryEntry, ModLoader, ModPack, PackMod, PackFileEntry, CatalogSource, InstallFromCatalogOptions, AddModToPackOptions } from "../types/mods";
 import {
@@ -51,6 +52,7 @@ import { launchMinecraft } from "../services/minecraftLaunch";
 import {
   fetchFriends,
   fetchMe,
+  getSocialApiUrl,
   handleSocialApiError,
   loginNuvoxelAccount,
   registerNuvoxelAccount,
@@ -173,6 +175,7 @@ interface AppState {
   accounts: Account[];
   activeAccountId: string;
   minecraftVersion: string;
+  clientMode: ClientMode;
 
   modPacks: ModPack[];
   activeModPackId: string | null;
@@ -294,6 +297,7 @@ interface AppState {
   refreshAccountData: (id: string) => Promise<boolean>;
   logoutAccount: (id: string) => void;
   setMinecraftVersion: (version: string) => void;
+  setClientMode: (mode: ClientMode) => void;
   setVersionPickerLoader: (loader: ModLoader) => void;
   setVersionFilter: (f: VersionFilter) => void;
   createModPack: (data: {
@@ -439,6 +443,7 @@ export const useAppStore = create<AppState>()(
       accounts: [],
       activeAccountId: "",
       minecraftVersion: "1.21.4",
+      clientMode: "standard",
 
       modPacks: [],
       activeModPackId: null,
@@ -758,6 +763,7 @@ export const useAppStore = create<AppState>()(
         setTimeout(() => set({ toastMessage: null }), 3000);
       },
       setMinecraftVersion: (version) => set({ minecraftVersion: version }),
+      setClientMode: (mode) => set({ clientMode: mode }),
       setVersionPickerLoader: (loader) => set({ versionPickerLoader: loader }),
       setVersionFilter: (f) => set({ versionFilter: f }),
       createModPack: ({ name, minecraftVersion, loader }) => {
@@ -2015,6 +2021,7 @@ export const useAppStore = create<AppState>()(
           accounts,
           activeAccountId,
           minecraftVersion,
+          clientMode,
           versionPickerLoader,
           activeModPackId,
           modPacks,
@@ -2072,8 +2079,9 @@ export const useAppStore = create<AppState>()(
           }
         }
 
+        const useNuvoxelClient = !pack && clientMode === "nuvoxel";
         const effectiveVersion = pack?.minecraftVersion ?? minecraftVersion;
-        const effectiveLoader = pack?.loader ?? versionPickerLoader;
+        const effectiveLoader = useNuvoxelClient ? "fabric" : (pack?.loader ?? versionPickerLoader);
         const entry: LaunchHistoryEntry = {
           id: crypto.randomUUID(),
           version: effectiveVersion,
@@ -2150,6 +2158,10 @@ export const useAppStore = create<AppState>()(
               language: get().language,
               accountType: account.type,
               resolution,
+              nuvoxelClient: useNuvoxelClient,
+              nuvoxelClientUrl: useNuvoxelClient
+                ? `${getSocialApiUrl()}/client/mods/nuvoxel-client.jar`
+                : undefined,
             },
             (progress) => {
               set({
@@ -2423,6 +2435,7 @@ export const useAppStore = create<AppState>()(
         accounts: s.accounts,
         activeAccountId: s.activeAccountId,
         minecraftVersion: s.minecraftVersion,
+        clientMode: s.clientMode,
         modPacks: s.modPacks,
         activeModPackId: s.activeModPackId,
         versionPickerLoader: s.versionPickerLoader,
