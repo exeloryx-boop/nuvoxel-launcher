@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -7,6 +8,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tokio::fs;
+use zip::ZipArchive;
 
 use crate::app_meta;
 
@@ -246,9 +248,42 @@ async fn ensure_nuvoxel_client(
     let mods_dir = game_dir.join("mods");
     fs::create_dir_all(&mods_dir).await.map_err(|e| e.to_string())?;
     let filename = format!("nuvoxel-client-{mc_version}.jar");
-    download_file(client, url, &mods_dir.join(filename), None, true)
+    let module_path = mods_dir.join(filename);
+    download_file(client, url, &module_path, None, true)
         .await
-        .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))
+        .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))?;
+
+    // Earlier builds accepted a malformed archive from the cache. If one is
+    // present, discard it and force one fresh download before reporting an
+    // error, so users recover without manually deleting profile files.
+    if validate_nuvoxel_client_jar(&module_path).is_err() {
+        fs::remove_file(&module_path)
+            .await
+            .map_err(|e| format!("ERR_NUVOXEL_CLIENT_REPLACE:{e}"))?;
+        download_file(client, url, &module_path, None, true)
+            .await
+            .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))?;
+    }
+    validate_nuvoxel_client_jar(&module_path)
+}
+
+/// Reject an incorrectly built Nuvoxel module before Fabric starts. Java ZIP
+/// class entries must use forward slashes, otherwise Fabric can read metadata
+/// but cannot load the declared entrypoint.
+fn validate_nuvoxel_client_jar(path: &Path) -> Result<(), String> {
+    let file = File::open(path).map_err(|e| format!("ERR_NUVOXEL_CLIENT_INVALID:{e}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| format!("ERR_NUVOXEL_CLIENT_INVALID:{e}"))?;
+
+    archive
+        .by_name("fabric.mod.json")
+        .map_err(|_| "ERR_NUVOXEL_CLIENT_INVALID:missing fabric.mod.json".to_string())?;
+    archive
+        .by_name("net/nuvoxel/client/NuvoxelClient.class")
+        .map_err(|_| {
+            "ERR_NUVOXEL_CLIENT_INVALID:missing net/nuvoxel/client/NuvoxelClient.class".to_string()
+        })?;
+    Ok(())
 }
 
 async fn save_merged_version(
