@@ -95,8 +95,8 @@ export function DownloadPage() {
 
   const triggerActualFileDownload = (ext: string) => {
     const link = document.createElement("a");
-    link.href = `/updates/files/NuvoxelLauncher-v0.7.0${ext}`;
-    link.download = `NuvoxelLauncher-v0.7.0${ext}`;
+    link.href = `/updates/files/NuvoxelLauncher-v0.7.1${ext}`;
+    link.download = `NuvoxelLauncher-v0.7.1${ext}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -106,7 +106,7 @@ export function DownloadPage() {
     <PageShell
       label={t("downloadLabel")}
       title="Завантажити Nuvoxel Launcher"
-      subtitle="Офіційний версіонний випуск v0.7.0 Nuvoxel. Оберіть зручний формат завантаження нижче."
+      subtitle="Офіційний версіонний випуск v0.7.1 Nuvoxel. Оберіть зручний формат завантаження нижче."
     >
       <div className="relative z-10 space-y-12">
         {/* Release Banner */}
@@ -118,7 +118,7 @@ export function DownloadPage() {
               </div>
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-2xl font-black text-white">Nuvoxel Launcher v0.7.0 Nuvoxel</h2>
+                  <h2 className="text-2xl font-black text-white">Nuvoxel Launcher v0.7.1 Nuvoxel</h2>
                   <span className="rounded-full border border-emerald-500/40 bg-emerald-500/20 px-3 py-0.5 text-xs font-bold text-emerald-300">
                     Останній стабільний реліз
                   </span>
@@ -305,7 +305,7 @@ export function DownloadPage() {
               <div className="rounded-xl border border-white/5 bg-black/40 p-4 space-y-2 text-xs text-zinc-300">
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Версія:</span>
-                  <span className="font-mono text-white">v0.7.0 Nuvoxel</span>
+                  <span className="font-mono text-white">v0.7.1 Nuvoxel</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">Формат:</span>
