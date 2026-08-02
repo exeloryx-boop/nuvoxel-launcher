@@ -519,6 +519,11 @@ fn ensure_bootstrap_legacy_classpath(jvm_args: &mut Vec<String>, classpath: &str
 }
 
 fn normalize_jvm_args(jvm_args: &mut Vec<String>, classpath: &str, natives_dir: &Path) {
+    // Mojang shipped this legacy option in the 26.2 manifest, but current
+    // Java runtimes reject it before Minecraft even starts.  Filtering it at
+    // launch time also repairs already-cached version manifests.
+    jvm_args.retain(|arg| !arg.starts_with("--sun-misc-unsafe-memory-access"));
+
     let is_module_launch = jvm_args.iter().any(|a| a == "-p");
     let natives = path_for_java(natives_dir);
 
