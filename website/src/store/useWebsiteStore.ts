@@ -9,7 +9,7 @@ import {
   type WebAuthSession,
 } from "@shared/skins";
 
-const getApiBase = () => {
+export const getApiBase = () => {
   if (typeof window !== "undefined" && window.location.origin) {
     const hostname = window.location.hostname;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -30,6 +30,7 @@ interface WebsiteState {
   selectedSkin: SelectedSkin | null;
   login: (emailOrUsername: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  completeLauncherSignIn: (code: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   setSelectedSkin: (skin: SelectedSkin) => void;
   hydrate: () => void;
@@ -92,6 +93,25 @@ export const useWebsiteStore = create<WebsiteState>((set) => ({
       saveWebAuth(session);
       set({ auth: session });
       return { ok: true };
+    } catch {
+      return { ok: false, error: "NETWORK_ERROR" };
+    }
+  },
+
+  completeLauncherSignIn: async (code) => {
+    const auth = loadWebAuth();
+    if (!auth?.token) return { ok: false, error: "UNAUTHORIZED" };
+    try {
+      const res = await fetch(`${getApiBase()}/auth/launcher/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      return res.ok ? { ok: true } : { ok: false, error: data.error || "LAUNCHER_AUTH_FAILED" };
     } catch {
       return { ok: false, error: "NETWORK_ERROR" };
     }

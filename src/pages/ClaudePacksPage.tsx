@@ -35,6 +35,7 @@ export function ClaudePacksPage() {
   const modPacks = useAppStore((state) => state.modPacks);
   const createModPack = useAppStore((state) => state.createModPack);
   const addModToPack = useAppStore((state) => state.addModToPack);
+  const setActiveModPack = useAppStore((state) => state.setActiveModPack);
   const [selectedPackId, setSelectedPackId] = useState("");
   const [description, setDescription] = useState("");
   const [shareCode, setShareCode] = useState("");
@@ -109,12 +110,21 @@ export function ClaudePacksPage() {
     setNotice("");
     try {
       const shared = await importSharedPack(session.token, shareCode);
-      const localPackId = createModPack({
+      // A repeated import continues a partial download instead of creating a
+      // duplicate profile for the same cloud build.
+      const existing = useAppStore.getState().modPacks.find(
+        (pack) => pack.name === shared.name &&
+          pack.minecraftVersion === shared.minecraftVersion &&
+          pack.loader === shared.loader,
+      );
+      const localPackId = existing?.id ?? createModPack({
         name: shared.name,
         minecraftVersion: shared.minecraftVersion,
         loader: shared.loader,
       });
+      setActiveModPack(localPackId);
       let installed = 0;
+      let failed = 0;
       for (const mod of shared.mods ?? []) {
         const catalogItem: CatalogItem = {
           id: mod.projectId,
@@ -129,12 +139,15 @@ export function ClaudePacksPage() {
           bannerUrl: null,
           categories: [],
         };
-        if (await addModToPack(localPackId, catalogItem, { versionId: mod.versionId })) {
-          installed += 1;
-        }
+        if (await addModToPack(localPackId, catalogItem, { versionId: mod.versionId })) installed += 1;
+        else failed += 1;
       }
       setShareCode("");
-      setNotice(`Збірку «${shared.name}» додано: встановлено модів ${installed}/${shared.modCount}.`);
+      setNotice(
+        failed === 0
+          ? `Збірку «${shared.name}» додано: встановлено модів ${installed}/${shared.modCount}.`
+          : `Збірку «${shared.name}» збережено, але ${failed} модів не вдалося завантажити. Повторіть імпорт за тим самим кодом — дубліката не буде.`,
+      );
     } catch (error) {
       const reason = error instanceof SocialApiError && error.code === "PACK_BLOCKED"
         ? "Цю збірку заблоковано модерацією."

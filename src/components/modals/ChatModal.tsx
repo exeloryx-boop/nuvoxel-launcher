@@ -5,6 +5,7 @@ import { fetchGlobalChat, fetchDMChat, getOrCreateQuickSession, handleSocialApiE
 import { SocialApiError } from "../../types/social";
 import { useAppStore } from "../../store/useAppStore";
 import { UserProfileModal } from "./UserProfileModal";
+import { loadCachedChat, mergeChatMessages, saveCachedChat } from "../../utils/chatCache";
 
 interface ChatModalProps {
   onClose: () => void;
@@ -26,14 +27,20 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const chatScope = activeTab === "global"
+    ? "global"
+    : session && selectedFriend
+      ? `dm:${[session.userId, selectedFriend.id].sort().join(":")}`
+      : "dm:unavailable";
+
   const loadMessages = async () => {
     try {
       if (activeTab === "global") {
         const data = await fetchGlobalChat();
-        setMessages(data);
+        setMessages((current) => mergeChatMessages(current, data));
       } else if (activeTab === "dm" && selectedFriend && session) {
         const data = await fetchDMChat(session.token, selectedFriend.id);
-        setMessages(data);
+        setMessages((current) => mergeChatMessages(current, data));
       }
     } catch {
       /* ignore poll errors */
@@ -41,10 +48,15 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
   };
 
   useEffect(() => {
+    setMessages(loadCachedChat(chatScope));
     loadMessages();
     const interval = setInterval(loadMessages, 3000);
     return () => clearInterval(interval);
-  }, [activeTab, selectedFriend, session]);
+  }, [chatScope]);
+
+  useEffect(() => {
+    saveCachedChat(chatScope, messages);
+  }, [chatScope, messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,8 +73,23 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
     let currentSession = session;
     if (!currentSession && activeAccount?.username) {
       try {
-        currentSession = await getOrCreateQuickSession(activeAccount.username);
-        useAppStore.setState({ nuvoxelSession: currentSession });
+        const quickSession = await getOrCreateQuickSession(activeAccount.username);
+        currentSession = quickSession;
+        // A quick chat session is a real Nuvoxel account.  Persist it on the
+        // active launcher account so chat, friends and cloud packs survive a
+        // launcher restart just like a normal sign-in.
+        useAppStore.setState((state) => ({
+          accounts: state.accounts.map((account) =>
+            account.id === activeAccount?.id
+              ? { ...account, type: "nuvoxel", nuvoxelUserId: quickSession.userId }
+              : account,
+          ),
+          nuvoxelSession: quickSession,
+          nuvoxelSessions: {
+            ...state.nuvoxelSessions,
+            [quickSession.userId]: quickSession,
+          },
+        }));
       } catch {
         /* failed to auto-session */
       }
@@ -81,22 +108,28 @@ export function ChatModal({ onClose, initialDMTarget }: ChatModalProps) {
     try {
       if (activeTab === "global") {
         const msg = await sendChatMessage(currentSession.token, content, "global");
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => mergeChatMessages(prev, [msg]));
       } else if (activeTab === "dm" && selectedFriend) {
         const msg = await sendChatMessage(currentSession.token, content, "dm", selectedFriend.id);
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => mergeChatMessages(prev, [msg]));
       }
     } catch (error) {
       if (error instanceof SocialApiError && error.code === "UNAUTHORIZED" && activeAccount?.username) {
         try {
           const restoredSession = await getOrCreateQuickSession(activeAccount.username);
-          useAppStore.setState({ nuvoxelSession: restoredSession });
+          useAppStore.setState((state) => ({
+            nuvoxelSession: restoredSession,
+            nuvoxelSessions: {
+              ...state.nuvoxelSessions,
+              [restoredSession.userId]: restoredSession,
+            },
+          }));
           if (activeTab === "global") {
             const msg = await sendChatMessage(restoredSession.token, content, "global");
-            setMessages((prev) => [...prev, msg]);
+            setMessages((prev) => mergeChatMessages(prev, [msg]));
           } else if (activeTab === "dm" && selectedFriend) {
             const msg = await sendChatMessage(restoredSession.token, content, "dm", selectedFriend.id);
-            setMessages((prev) => [...prev, msg]);
+            setMessages((prev) => mergeChatMessages(prev, [msg]));
           }
           return;
         } catch {

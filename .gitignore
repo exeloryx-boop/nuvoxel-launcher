@@ -28,3 +28,7 @@ dist-ssr
 
 # Rust build artifacts (old nlauncher.* deps live here until cleaned)
 src-tauri/target/
+
+# Gradle build artifacts
+nuvoxel-client/.gradle/
+nuvoxel-client/build/

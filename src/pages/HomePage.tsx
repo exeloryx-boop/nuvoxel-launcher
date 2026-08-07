@@ -49,6 +49,7 @@ import { maskPrivateText } from "../utils/privacyMask";
 import { useComfortableLayout } from "../hooks/useComfortableLayout";
 import { SHIMMER_SURFACE } from "../utils/shimmer";
 import { VoxelCanvas } from "../components/home/VoxelCanvas";
+import { GlobalAnnouncementBanner } from "../components/home/GlobalAnnouncementBanner";
 
 
 
@@ -268,6 +269,8 @@ export function HomePage() {
       >
 
         {showLauncherTips ? <LauncherTipBanner /> : null}
+
+        <GlobalAnnouncementBanner />
 
         {gameRunning ? (
 
@@ -715,4 +718,3 @@ function StatCard({
     </div>
   );
 }
-

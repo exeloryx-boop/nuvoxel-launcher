@@ -182,32 +182,27 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
     )
     .await?;
 
-    if opts.skin_username.is_some()
-        || opts.custom_skin_data.is_some()
-        || opts.custom_cape_data.is_some()
-    {
-        emit(app, "skin", None, None, Some(90));
-        if matches!(loader, "fabric" | "quilt" | "forge" | "neoforge") {
-            if let Err(e) = ensure_custom_skin_loader(&client, &game_dir, &opts.version, loader).await
-            {
-                eprintln!("CustomSkinLoader skipped: {e}");
-            }
+    emit(app, "skin", None, None, Some(90));
+    if matches!(loader, "fabric" | "quilt" | "forge" | "neoforge") {
+        if let Err(e) = ensure_custom_skin_loader(&client, &game_dir, &opts.version, loader).await {
+            eprintln!("CustomSkinLoader skipped: {e}");
         }
-        apply_skin(
-            &client,
-            &game_dir,
-            &opts.username,
-            opts.skin_username.as_deref(),
-            opts.skin_model.as_deref(),
-            opts.skin_cape_username.as_deref(),
-            opts.custom_skin_data.as_deref(),
-            opts.custom_cape_data.as_deref(),
-        )
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Skin apply skipped: {e}");
-        });
     }
+    let effective_skin_user = opts.skin_username.as_deref().unwrap_or(&opts.username);
+    apply_skin(
+        &client,
+        &game_dir,
+        &opts.username,
+        Some(effective_skin_user),
+        opts.skin_model.as_deref(),
+        opts.skin_cape_username.as_deref(),
+        opts.custom_skin_data.as_deref(),
+        opts.custom_cape_data.as_deref(),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        eprintln!("Skin apply skipped: {e}");
+    });
 
     emit(app, "session", None, None, Some(88));
     let (uuid_str, access_token) =
@@ -241,28 +236,41 @@ async fn ensure_nuvoxel_client(
     mc_version: &str,
     url: Option<&str>,
 ) -> Result<(), String> {
-    let url = url.ok_or("ERR_NUVOXEL_CLIENT_UNAVAILABLE")?;
-    if !url.starts_with("https://") && !url.starts_with("http://127.0.0.1:") && !url.starts_with("http://localhost:") {
-        return Err("ERR_NUVOXEL_CLIENT_URL".into());
-    }
     let mods_dir = game_dir.join("mods");
     fs::create_dir_all(&mods_dir).await.map_err(|e| e.to_string())?;
     let filename = format!("nuvoxel-client-{mc_version}.jar");
     let module_path = mods_dir.join(filename);
-    download_file(client, url, &module_path, None, true)
-        .await
-        .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))?;
 
-    // Earlier builds accepted a malformed archive from the cache. If one is
-    // present, discard it and force one fresh download before reporting an
-    // error, so users recover without manually deleting profile files.
+    let mut download_err = None;
+    if let Some(u) = url {
+        if u.starts_with("https://") || u.starts_with("http://127.0.0.1:") || u.starts_with("http://localhost:") {
+            if let Err(e) = download_file(client, u, &module_path, None, true).await {
+                download_err = Some(e);
+            }
+        }
+    }
+
     if validate_nuvoxel_client_jar(&module_path).is_err() {
-        fs::remove_file(&module_path)
-            .await
-            .map_err(|e| format!("ERR_NUVOXEL_CLIENT_REPLACE:{e}"))?;
-        download_file(client, url, &module_path, None, true)
-            .await
-            .map_err(|e| format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"))?;
+        let local_candidates = [
+            PathBuf::from("nuvoxel-client.jar"),
+            PathBuf::from("api/client-mods/nuvoxel-client.jar"),
+            PathBuf::from("nuvoxel-client/build/libs/nuvoxel-client-0.2.0-beta.jar"),
+        ];
+        let mut copied = false;
+        for candidate in &local_candidates {
+            if candidate.exists() && validate_nuvoxel_client_jar(candidate).is_ok() {
+                if fs::copy(candidate, &module_path).await.is_ok() {
+                    copied = true;
+                    break;
+                }
+            }
+        }
+        if !copied {
+            if let Some(e) = download_err {
+                return Err(format!("ERR_NUVOXEL_CLIENT_DOWNLOAD:{e}"));
+            }
+            return Err("ERR_NUVOXEL_CLIENT_UNAVAILABLE".into());
+        }
     }
     validate_nuvoxel_client_jar(&module_path)
 }

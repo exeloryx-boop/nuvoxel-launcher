@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, LogIn, UserPlus, ShieldCheck, Palette, Sparkles, Gamepad2, Info } from "lucide-react";
 import { useWebsiteStore } from "../store/useWebsiteStore";
 import { useWebI18n } from "../hooks/useWebI18n";
@@ -8,9 +8,12 @@ export function LoginPage() {
   const { t } = useWebI18n();
   const login = useWebsiteStore((s) => s.login);
   const register = useWebsiteStore((s) => s.register);
+  const completeLauncherSignIn = useWebsiteStore((s) => s.completeLauncherSignIn);
   const auth = useWebsiteStore((s) => s.auth);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const launcherCode = searchParams.get("launcherCode");
   const from = (location.state as { from?: string })?.from ?? (auth?.role === "admin" ? "/admin" : "/profile");
 
   const [mode, setMode] = useState<"login" | "register" | "launcher">("login");
@@ -20,12 +23,26 @@ export function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [launcherStatus, setLauncherStatus] = useState("");
+  const completedLauncherCode = useRef<string | null>(null);
 
   useEffect(() => {
     if (auth?.loggedIn) {
+      if (launcherCode) {
+        if (completedLauncherCode.current === launcherCode) return;
+        completedLauncherCode.current = launcherCode;
+        void completeLauncherSignIn(launcherCode).then((result) => {
+          setLauncherStatus(
+            result.ok
+              ? "Готово! Поверніться до Nuvoxel Launcher — вхід буде завершено автоматично."
+              : "Не вдалося підтвердити вхід. Поверніться до лаунчера й спробуйте ще раз.",
+          );
+        });
+        return;
+      }
       navigate(auth.role === "admin" ? "/admin" : from, { replace: true });
     }
-  }, [auth, from, navigate]);
+  }, [auth, completeLauncherSignIn, from, launcherCode, navigate]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -148,6 +165,12 @@ export function LoginPage() {
         {errorMsg && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 animate-bounce-in">
             {errorMsg}
+          </div>
+        )}
+
+        {launcherCode && launcherStatus && (
+          <div className="mb-4 rounded-xl border border-[var(--nl-green)]/30 bg-[var(--nl-green)]/10 p-3 text-xs text-zinc-200">
+            {launcherStatus}
           </div>
         )}
 

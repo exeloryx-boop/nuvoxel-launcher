@@ -78,6 +78,7 @@ export type SocialApiErrorCode =
   | "PACK_PENDING"
   | "INVALID_PACK_REVIEW"
   | "REVIEW_REASON_REQUIRED"
+  | "LAUNCHER_AUTH_NOT_FOUND"
   | "NETWORK"
   | "SERVER_ERROR";
 

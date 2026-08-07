@@ -120,6 +120,24 @@ export async function loginNuvoxelAccount(input: {
   });
 }
 
+export interface LauncherBrowserAuth {
+  code: string;
+  expiresAt: number;
+}
+
+export async function startLauncherBrowserAuth(): Promise<LauncherBrowserAuth> {
+  return request<LauncherBrowserAuth>("/auth/launcher/start", { method: "POST" });
+}
+
+export async function pollLauncherBrowserAuth(code: string): Promise<{
+  status: "pending" | "complete";
+  expiresAt: number;
+  token?: string;
+  user?: NuvoxelUser;
+}> {
+  return request(`/auth/launcher/poll/${encodeURIComponent(code)}`);
+}
+
 export async function fetchMe(token: string): Promise<FriendProfile> {
   return request("/auth/me", { token });
 }

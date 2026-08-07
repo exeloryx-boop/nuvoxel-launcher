@@ -596,21 +596,57 @@ export const useAppStore = create<AppState>()(
           id,
           get().nuvoxelSessions,
         );
+        const account = get().accounts.find((a) => a.id === id);
         set({
           activeAccountId: id,
           nuvoxelSession: session,
           friends: [],
           socialApiOnline: false,
         });
+        if (account && account.username) {
+          const currentSkin = get().selectedSkin;
+          if (!currentSkin || !currentSkin.customSkinData || currentSkin.id === "default-steve") {
+            const newSkin: SelectedSkin = {
+              id: `acc-skin-${account.username.toLowerCase()}`,
+              name: account.username,
+              username: account.username,
+              model: currentSkin?.model ?? "classic",
+              capeId: currentSkin?.capeId ?? null,
+              customSkinData: currentSkin?.customSkinData ?? null,
+              customCapeData: currentSkin?.customCapeData ?? null,
+            };
+            saveSelectedSkin(newSkin);
+            set({ selectedSkin: newSkin });
+          }
+        }
         if (session) void get().refreshFriends();
       },
       addLocalAccount: (username) => {
         const id = crypto.randomUUID();
-        set((s) => ({
-          accounts: [...s.accounts, { id, username, type: "local" }],
+        const newAccounts = [...get().accounts, { id, username, type: "local" as const }];
+        const currentSkin = get().selectedSkin;
+        const newSkin: SelectedSkin = (!currentSkin || !currentSkin.customSkinData || currentSkin.id === "default-steve")
+          ? {
+              id: `acc-skin-${username.toLowerCase()}`,
+              name: username,
+              username: username,
+              model: currentSkin?.model ?? "classic",
+              capeId: currentSkin?.capeId ?? null,
+              customSkinData: currentSkin?.customSkinData ?? null,
+              customCapeData: currentSkin?.customCapeData ?? null,
+            }
+          : currentSkin;
+
+        if (newSkin !== currentSkin) {
+          saveSelectedSkin(newSkin);
+        }
+
+        set({
+          accounts: newAccounts,
           activeAccountId: id,
+          selectedSkin: newSkin,
           showAddAccountModal: false,
-        }));
+        });
       },
       removeAccount: (id) => {
         const removed = get().accounts.find((a) => a.id === id);

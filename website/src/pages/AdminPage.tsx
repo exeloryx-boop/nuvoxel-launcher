@@ -329,6 +329,26 @@ export function AdminPage() {
     setTimeout(() => setStatusMsg(""), 3000);
   };
 
+  const handleDeleteChatMessage = async (messageId: string) => {
+    if (!window.confirm("Видалити це повідомлення з чату?")) return;
+    try {
+      const response = await fetch(`${getApiBase()}/admin/chat/delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`,
+        },
+        body: JSON.stringify({ messageId }),
+      });
+      if (!response.ok) throw new Error("delete failed");
+      setChatMessages((current) => current.filter((message) => message.id !== messageId));
+      setStatusMsg("Повідомлення видалено з чату");
+    } catch {
+      setStatusMsg("Не вдалося видалити повідомлення");
+    }
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
   const handlePackReview = async (
     packId: string,
     status: "approved" | "blocked",
@@ -817,6 +837,14 @@ export function AdminPage() {
                           </span>
                         )}
                         <span className="text-xs text-zinc-500 ml-auto">{formatTime(m.timestamp)}</span>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteChatMessage(m.id)}
+                          className="rounded-md p-1 text-zinc-500 transition hover:bg-red-500/15 hover:text-red-300"
+                          title="Видалити повідомлення"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                       <p className={`mt-1.5 break-words leading-relaxed ${m.flagged ? "text-red-200 font-medium" : "text-zinc-300"}`}>
                         {m.text}

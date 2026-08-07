@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.7.1";
 
 /** Set to true when update server is ready for users. */
 export const AUTO_UPDATES_ENABLED = false;

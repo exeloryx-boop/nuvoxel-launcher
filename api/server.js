@@ -44,12 +44,15 @@ const LEGACY_DB_PATHS = [
 ];
 const UPDATES_PATH = join(__dirname, "updates.json");
 const UPDATES_FILES_DIR = join(__dirname, "updates", "files");
+const CLIENT_MODS_DIR = join(__dirname, "client-mods");
 const makeFriendCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
 const makePackCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 10);
 const JWT_SECRET =
   process.env.JWT_SECRET || "nuvoxel-dev-secret-change-in-production";
 const PORT = Number(process.env.PORT || 3847);
 const ONLINE_WINDOW_MS = 90_000;
+const LAUNCHER_AUTH_TTL_MS = 5 * 60_000;
+const launcherAuthRequests = new Map();
 const CURSEFORGE_API_BASE = "https://api.curseforge.com/v1";
 const CURSEFORGE_API_KEY =
   process.env.CURSEFORGE_API_KEY?.trim() ||
@@ -171,11 +174,20 @@ function normalizeDb(data) {
 function saveDb(db) {
   try {
     mkdirSync(dirname(DB_PATH), { recursive: true });
-    writeFileSync(DB_PATH, JSON.stringify(normalizeDb(db), null, 2), "utf8");
+    // Never overwrite the live database in-place.  An interrupted write used to
+    // leave an empty/corrupt file, which looked like all accounts and chat had
+    // disappeared after restarting the API.
+    const tempPath = `${DB_PATH}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tempPath, JSON.stringify(normalizeDb(db), null, 2), "utf8");
+    renameSync(tempPath, DB_PATH);
   } catch (e) {
     console.error("Critical: Failed to save DB:", e);
   }
 }
+
+// Create and normalize the persistent store on boot as well, rather than only
+// after the first mutation request.
+saveDb(loadDb());
 
 let dbChain = Promise.resolve();
 
@@ -216,6 +228,13 @@ function issueToken(user) {
   );
 }
 
+function pruneLauncherAuthRequests() {
+  const now = Date.now();
+  for (const [code, request] of launcherAuthRequests) {
+    if (request.expiresAt <= now || request.consumedAt) launcherAuthRequests.delete(code);
+  }
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -223,7 +242,12 @@ app.use(express.json());
 if (!existsSync(UPDATES_FILES_DIR)) {
   mkdirSync(UPDATES_FILES_DIR, { recursive: true });
 }
+if (!existsSync(CLIENT_MODS_DIR)) {
+  mkdirSync(CLIENT_MODS_DIR, { recursive: true });
+}
 app.use("/updates/files", express.static(UPDATES_FILES_DIR));
+// Published launcher modules: client-mods/<mc-version>/nuvoxel-client.jar
+app.use("/client/mods", express.static(CLIENT_MODS_DIR));
 
 app.get("/updates/latest", (_req, res) => {
   try {
@@ -464,6 +488,52 @@ app.post("/auth/login", (req, res) => {
   })
     .then((payload) => res.json(payload))
     .catch((e) => sendError(res, e));
+});
+
+// Browser-to-launcher sign-in. The launcher only receives a one-time code;
+// credentials continue to be entered exclusively on the website.
+app.post("/auth/launcher/start", (_req, res) => {
+  pruneLauncherAuthRequests();
+  const code = `${randomUUID()}${randomUUID()}`.replace(/-/g, "");
+  const expiresAt = Date.now() + LAUNCHER_AUTH_TTL_MS;
+  launcherAuthRequests.set(code, { expiresAt, auth: null, consumedAt: null });
+  res.status(201).json({ code, expiresAt });
+});
+
+app.post("/auth/launcher/complete", auth, (req, res) => {
+  pruneLauncherAuthRequests();
+  const code = String(req.body?.code ?? "");
+  const request = launcherAuthRequests.get(code);
+  if (!request || request.expiresAt <= Date.now()) {
+    return res.status(404).json({ error: "LAUNCHER_AUTH_NOT_FOUND" });
+  }
+  const db = loadDb();
+  const user = db.users[req.auth.sub];
+  if (!user) return res.status(401).json({ error: "UNAUTHORIZED" });
+  request.auth = {
+    token: issueToken(user),
+    user: {
+      id: user.id,
+      username: user.username,
+      friendCode: user.friendCode,
+      email: user.email,
+      role: user.role || "user",
+    },
+  };
+  res.json({ ok: true, expiresAt: request.expiresAt });
+});
+
+app.get("/auth/launcher/poll/:code", (req, res) => {
+  pruneLauncherAuthRequests();
+  const request = launcherAuthRequests.get(req.params.code);
+  if (!request || request.expiresAt <= Date.now()) {
+    return res.status(404).json({ error: "LAUNCHER_AUTH_NOT_FOUND" });
+  }
+  if (!request.auth) return res.json({ status: "pending", expiresAt: request.expiresAt });
+  request.consumedAt = Date.now();
+  const auth = request.auth;
+  launcherAuthRequests.delete(req.params.code);
+  res.json({ status: "complete", ...auth });
 });
 
 app.get("/auth/me", auth, (req, res) => {
@@ -821,6 +891,22 @@ app.get("/admin/chat", auth, adminAuth, (_req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+// Moderators can remove an abusive message without deleting the player or
+// wiping the rest of the chat history.
+app.post("/admin/chat/delete", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const messageId = String(req.body?.messageId ?? "");
+    const before = db.chatMessages.length;
+    db.chatMessages = db.chatMessages.filter((message) => message.id !== messageId);
+    if (db.chatMessages.length === before) throw new ApiError(404, "NOT_FOUND");
+    saveDb(db);
+    return { ok: true, messageId };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 // Admin: get all profanity violations
 app.get("/admin/violations", auth, adminAuth, (_req, res) => {
   void withDb(() => {
@@ -1113,6 +1199,7 @@ if (existsSync(PUBLIC_DIR)) {
     "/admin/stats",
     "/admin/users",
     "/admin/chat",
+    "/admin/chat/delete",
     "/admin/violations",
     "/admin/broadcast",
     "/admin/claude",
@@ -1146,4 +1233,3 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 export default app;
-

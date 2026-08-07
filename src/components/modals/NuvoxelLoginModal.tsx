@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ExternalLink, Loader2, X } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { BlurOverlay } from "../ui/BlurOverlay";
 import { t } from "../../i18n";
 import { useAppStore } from "../../store/useAppStore";
+import {
+  getSocialApiUrl,
+  pollLauncherBrowserAuth,
+  sessionFromAuth,
+  startLauncherBrowserAuth,
+} from "../../services/nuvoxelApi";
 
 type AuthMode = "login" | "register";
 
@@ -19,6 +26,14 @@ export function NuvoxelLoginModal() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [browserLoading, setBrowserLoading] = useState(false);
+  const [browserHint, setBrowserHint] = useState("");
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = null;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -29,12 +44,17 @@ export function NuvoxelLoginModal() {
     return () => window.removeEventListener("keydown", handler);
   }, [open, setOpen]);
 
+  useEffect(() => () => stopPolling(), []);
+
   useEffect(() => {
     if (!open) {
       setMode("login");
       setUsername("");
       setEmail("");
       setPassword("");
+      setBrowserLoading(false);
+      setBrowserHint("");
+      stopPolling();
     }
   }, [open]);
 
@@ -56,6 +76,71 @@ export function NuvoxelLoginModal() {
     setOpen(false);
     setShowAddAccountModal(true);
     setAddAccountView("select");
+  };
+
+  const finishBrowserLogin = (auth: { token: string; user: { id: string; username: string; friendCode: string } }) => {
+    const session = sessionFromAuth(auth);
+    useAppStore.setState((state) => {
+      const active = state.accounts.find((account) => account.id === state.activeAccountId);
+      const existing = state.accounts.find(
+        (account) => account.type === "nuvoxel" && account.nuvoxelUserId === auth.user.id,
+      ) ?? state.accounts.find(
+        (account) => account.type === "local" && account.username.toLowerCase() === auth.user.username.toLowerCase(),
+      ) ?? (active?.type === "local" ? active : undefined);
+      const accountId = existing?.id ?? crypto.randomUUID();
+      const account = {
+        ...existing,
+        id: accountId,
+        username: auth.user.username,
+        type: "nuvoxel" as const,
+        nuvoxelUserId: auth.user.id,
+      };
+      return {
+        accounts: existing
+          ? state.accounts.map((item) => item.id === accountId ? account : item)
+          : [...state.accounts, account],
+        activeAccountId: accountId,
+        nuvoxelSession: session,
+        nuvoxelSessions: { ...state.nuvoxelSessions, [session.userId]: session },
+        showNuvoxelLogin: false,
+        showAddAccountModal: false,
+        toastMessage: "loginSuccess",
+      };
+    });
+    setTimeout(() => useAppStore.setState({ toastMessage: null }), 2500);
+    void useAppStore.getState().refreshFriends();
+  };
+
+  const loginWithBrowser = async () => {
+    if (browserLoading) return;
+    setBrowserLoading(true);
+    setBrowserHint("Відкриваємо Nuvoxel ID у браузері…");
+    try {
+      const request = await startLauncherBrowserAuth();
+      const url = `${getSocialApiUrl()}/login?launcherCode=${encodeURIComponent(request.code)}`;
+      try {
+        await openUrl(url);
+      } catch {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+      setBrowserHint("Увійдіть на сайті Nuvoxel ID. Лаунчер завершить вхід автоматично.");
+      stopPolling();
+      pollTimer.current = setInterval(() => {
+        void pollLauncherBrowserAuth(request.code).then((result) => {
+          if (result.status !== "complete" || !result.token || !result.user) return;
+          stopPolling();
+          setBrowserLoading(false);
+          finishBrowserLogin({ token: result.token, user: result.user });
+        }).catch(() => {
+          stopPolling();
+          setBrowserLoading(false);
+          setBrowserHint("Час входу минув. Натисніть кнопку й спробуйте ще раз.");
+        });
+      }, 1500);
+    } catch {
+      setBrowserLoading(false);
+      setBrowserHint("Не вдалося відкрити Nuvoxel ID. Перевірте інтернет і спробуйте ще раз.");
+    }
   };
 
   if (!open) return null;
@@ -126,6 +211,17 @@ export function NuvoxelLoginModal() {
               {t("register")}
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => void loginWithBrowser()}
+            disabled={browserLoading}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 py-3 text-sm font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/20 disabled:opacity-60"
+          >
+            {browserLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+            Увійти через Nuvoxel ID у браузері
+          </button>
+          {browserHint && <p className="-mt-2 mb-4 text-center text-xs text-text-muted">{browserHint}</p>}
 
           <div className="space-y-4" onKeyDown={(e) => {
             if (e.key === "Enter" && canSubmit && !loading) void handleSubmit();
