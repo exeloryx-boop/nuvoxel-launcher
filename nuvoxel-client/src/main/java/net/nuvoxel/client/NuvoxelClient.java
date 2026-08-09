@@ -33,6 +33,7 @@ public final class NuvoxelClient implements ClientModInitializer {
         INSTANCE = this;
 
         moduleManager = new ModuleManager();
+        net.nuvoxel.client.core.ConfigManager.init();
 
         // Register ClickGUI keybind via Fabric API
         clickGuiKeybind = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -56,7 +57,7 @@ public final class NuvoxelClient implements ClientModInitializer {
             if (!welcomeShown) {
                 welcomeShown = true;
                 showChatMessage(client, "§b§l[Nuvoxel] §r§7Visual Client §av" + VERSION + " §7loaded!");
-                showChatMessage(client, "§b§l[Nuvoxel] §r§7Press §e§lRSHIFT §7to open ClickGUI");
+                showChatMessage(client, "§b§l[Nuvoxel] §r§7Press §e§lRSHIFT §7for ClickGUI | Use §e§l.config §7to save setups!");
             }
 
             // ClickGUI toggle
