@@ -23,25 +23,19 @@ export function TitleBar() {
   return (
     <header
       data-tauri-drag-region
-      className={`app-titlebar ${SHIMMER_SURFACE} relative z-20 flex h-11 shrink-0 items-center justify-between overflow-hidden border-b border-white/10 bg-bg-secondary/90 backdrop-blur-xl px-3.5 select-none`}
+      className={`app-titlebar ${SHIMMER_SURFACE} relative z-20 flex h-12 shrink-0 items-center justify-between overflow-hidden border-b border-white/[0.07] bg-[#101316]/90 backdrop-blur-xl px-4 select-none`}
     >
-      {/* Top subtle accent glow gradient */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-40" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-200/25 to-transparent" />
 
       <div className="relative z-10 flex items-center gap-3">
-        <div className="relative flex items-center justify-center">
-          <div className="absolute inset-0 rounded-lg bg-[var(--accent)]/30 blur-sm" />
-          <img
-            src="/logo.svg"
-            alt=""
-            className="relative h-6 w-6 rounded-lg object-cover ring-1 ring-white/20"
-          />
-        </div>
-        <span className="text-xs font-bold uppercase tracking-wider text-text-primary">
+        <span className="rounded-md border border-emerald-300/15 bg-emerald-300/[0.06] px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200">
+          Launcher
+        </span>
+        <span className="text-xs font-bold tracking-wide text-text-primary">
           {t("appName")}
         </span>
-        <span className="flex items-center gap-1.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-[0_0_10px_color-mix(in_srgb,var(--accent)_15%,transparent)]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+        <span className="flex items-center gap-1.5 text-[10px] font-medium text-text-muted">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
           {t("appVersion")}
         </span>
       </div>
@@ -84,8 +78,8 @@ function WindowButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`flex h-8 w-9 items-center justify-center rounded-lg text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary active:scale-95 ${
-        danger ? "hover:bg-red-500 hover:text-white hover:shadow-[0_0_12px_rgba(239,68,68,0.5)]" : ""
+      className={`flex h-8 w-9 items-center justify-center rounded-lg text-text-secondary transition-all duration-200 hover:bg-white/[0.08] hover:text-text-primary active:scale-95 ${
+        danger ? "hover:bg-red-500 hover:text-white" : ""
       }`}
     >
       {icon}

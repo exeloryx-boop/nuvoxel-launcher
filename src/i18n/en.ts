@@ -637,6 +637,7 @@ export const en: Record<keyof typeof ru, string> = {
   skinNoResults: "No skins found",
 
   progressLoader: "Installing mod loader…",
+  progressNuvoxel: "Downloading Nuvoxel Client and Fabric API…",
   progressManifest: "Fetching version information…",
   progressClient: "Downloading Minecraft client…",
   progressLibraries: "Downloading libraries…",

@@ -101,7 +101,7 @@ const getApiBase = () => {
       return window.location.origin;
     }
   }
-  return "https://nuvoxel-launcher.onrender.com";
+  return "https://nuvoxel-launcher-z6va.onrender.com";
 };
 
 type Tab = "overview" | "users" | "launcher" | "claude" | "moderation";

@@ -10,7 +10,7 @@ import type {
 import { SocialApiError } from "../types/social";
 import { useAppStore } from "../store/useAppStore";
 
-const DEFAULT_API = "https://nuvoxel-launcher.onrender.com";
+const DEFAULT_API = "https://nuvoxel-launcher-z6va.onrender.com";
 
 export function getSocialApiUrl(): string {
   const fromStore = useAppStore.getState().socialApiUrl?.trim();

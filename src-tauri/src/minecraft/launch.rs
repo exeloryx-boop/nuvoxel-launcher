@@ -13,10 +13,11 @@ use zip::ZipArchive;
 use crate::app_meta;
 
 use super::download::{
-    apply_skin, build_classpath, cleanup_stale_loader_version_jar, download_all_libraries,
-    download_assets, download_client, ensure_custom_skin_loader, ensure_vanilla_base,
-    extract_natives, forge_bootstrap_classpath_extras, is_forge_bootstrap, legacy_arguments,
-    path_for_java, process_arguments, resolve_inherited_version, classpath_for_java, download_file,
+    apply_skin, build_classpath, classpath_for_java, cleanup_stale_loader_version_jar,
+    download_all_libraries, download_assets, download_client, download_file,
+    ensure_custom_skin_loader, ensure_vanilla_base, extract_natives,
+    forge_bootstrap_classpath_extras, is_forge_bootstrap, legacy_arguments, path_for_java,
+    process_arguments, resolve_inherited_version,
 };
 use super::java::{find_java_for_version, find_or_install_java_for_version};
 use super::mod_loaders::resolve_loader_version;
@@ -59,13 +60,7 @@ pub struct LaunchProgress {
     pub percent: Option<u8>,
 }
 
-fn emit(
-    app: &AppHandle,
-    stage: &str,
-    n: Option<u32>,
-    total: Option<u32>,
-    percent: Option<u8>,
-) {
+fn emit(app: &AppHandle, stage: &str, n: Option<u32>, total: Option<u32>, percent: Option<u8>) {
     let _ = app.emit(
         "launch-progress",
         LaunchProgress {
@@ -83,6 +78,10 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
     } else {
         &opts.loader
     };
+
+    if opts.nuvoxel_client && !is_supported_nuvoxel_version(&opts.version) {
+        return Err(format!("ERR_NUVOXEL_UNSUPPORTED_VERSION:{}", opts.version));
+    }
 
     if loader != "vanilla" {
         emit(app, "loader", None, None, None);
@@ -109,22 +108,13 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
 
     emit(app, "manifest", None, None, None);
 
-    let java = find_or_install_java_for_version(
-        opts.java_path.as_deref(),
-        &opts.version,
-        &game_dir,
-    )
-    .await?;
+    let java =
+        find_or_install_java_for_version(opts.java_path.as_deref(), &opts.version, &game_dir)
+            .await?;
 
     if loader == "forge" || loader == "neoforge" || loader == "optifine" {
         emit(app, "client", None, None, Some(3));
-        ensure_vanilla_base(
-            &client,
-            &game_dir,
-            &opts.version,
-            opts.integrity_check,
-        )
-        .await?;
+        ensure_vanilla_base(&client, &game_dir, &opts.version, opts.integrity_check).await?;
     }
 
     let (version_id, version_json) = resolve_loader_version(
@@ -143,7 +133,14 @@ pub async fn launch(app: &AppHandle, opts: LaunchOptions) -> Result<u32, String>
         if loader != "fabric" && loader != "quilt" {
             return Err("ERR_NUVOXEL_REQUIRES_FABRIC".into());
         }
-        ensure_nuvoxel_client(&client, &game_dir, &opts.version, opts.nuvoxel_client_url.as_deref()).await?;
+        emit(app, "nuvoxel", None, None, Some(4));
+        ensure_nuvoxel_client(
+            &client,
+            &game_dir,
+            &opts.version,
+            opts.nuvoxel_client_url.as_deref(),
+        )
+        .await?;
     }
 
     emit(app, "client", None, None, Some(5));
@@ -237,13 +234,18 @@ async fn ensure_nuvoxel_client(
     url: Option<&str>,
 ) -> Result<(), String> {
     let mods_dir = game_dir.join("mods");
-    fs::create_dir_all(&mods_dir).await.map_err(|e| e.to_string())?;
+    fs::create_dir_all(&mods_dir)
+        .await
+        .map_err(|e| e.to_string())?;
     let filename = format!("nuvoxel-client-{mc_version}.jar");
     let module_path = mods_dir.join(filename);
 
     let mut download_err = None;
     if let Some(u) = url {
-        if u.starts_with("https://") || u.starts_with("http://127.0.0.1:") || u.starts_with("http://localhost:") {
+        if u.starts_with("https://")
+            || u.starts_with("http://127.0.0.1:")
+            || u.starts_with("http://localhost:")
+        {
             if let Err(e) = download_file(client, u, &module_path, None, true).await {
                 download_err = Some(e);
             }
@@ -272,7 +274,89 @@ async fn ensure_nuvoxel_client(
             return Err("ERR_NUVOXEL_CLIENT_UNAVAILABLE".into());
         }
     }
-    validate_nuvoxel_client_jar(&module_path)
+    validate_nuvoxel_client_jar(&module_path)?;
+    ensure_fabric_api(client, &mods_dir, mc_version).await
+}
+
+/// Nuvoxel uses Fabric's keybinding and lifecycle APIs.  Fabric Loader itself
+/// does not provide those APIs, so install the exact Fabric API release that
+/// Modrinth marks compatible with the selected Minecraft version.
+async fn ensure_fabric_api(
+    client: &Client,
+    mods_dir: &Path,
+    mc_version: &str,
+) -> Result<(), String> {
+    let api_url = fabric_api_versions_url(mc_version)?;
+
+    let versions: serde_json::Value = client
+        .get(api_url)
+        .send()
+        .await
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API:{e}"))?
+        .error_for_status()
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API:{e}"))?
+        .json()
+        .await
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API:{e}"))?;
+
+    let file = versions
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|version| {
+            version["files"].as_array().and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file["primary"].as_bool() == Some(true))
+                    .or_else(|| files.first())
+            })
+        })
+        .ok_or_else(|| format!("ERR_NUVOXEL_FABRIC_API_UNAVAILABLE:{mc_version}"))?;
+
+    let download_url = file["url"]
+        .as_str()
+        .ok_or_else(|| format!("ERR_NUVOXEL_FABRIC_API_UNAVAILABLE:{mc_version}"))?;
+    let filename = file["filename"]
+        .as_str()
+        .filter(|name| is_safe_jar_filename(name))
+        .ok_or("ERR_NUVOXEL_FABRIC_API_INVALID_FILENAME")?;
+    let sha1 = file["hashes"]["sha1"].as_str();
+    let api_path = mods_dir.join(filename);
+
+    download_file(client, download_url, &api_path, sha1, true)
+        .await
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API:{e}"))?;
+    validate_fabric_api_jar(&api_path)?;
+
+    // A Nuvoxel profile is launcher-managed.  Retain only the Fabric API JAR
+    // selected above, otherwise two API versions can make Fabric fail before
+    // Minecraft reaches the title screen.
+    let mut entries = fs::read_dir(mods_dir).await.map_err(|e| e.to_string())?;
+    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+        let path = entry.path();
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if path != api_path && name.starts_with("fabric-api-") && name.ends_with(".jar") {
+            fs::remove_file(path).await.map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn fabric_api_versions_url(mc_version: &str) -> Result<reqwest::Url, String> {
+    let mut api_url = reqwest::Url::parse("https://api.modrinth.com/v2/project/fabric-api/version")
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API:{e}"))?;
+    api_url
+        .query_pairs_mut()
+        .append_pair("game_versions", &format!(r#"["{mc_version}"]"#))
+        .append_pair("loaders", r#"["fabric"]"#);
+    Ok(api_url)
+}
+
+fn is_safe_jar_filename(name: &str) -> bool {
+    !name.is_empty()
+        && name.ends_with(".jar")
+        && !name.contains(['/', '\\'])
+        && !name.contains("..")
 }
 
 /// Reject an incorrectly built Nuvoxel module before Fabric starts. Java ZIP
@@ -292,6 +376,24 @@ fn validate_nuvoxel_client_jar(path: &Path) -> Result<(), String> {
             "ERR_NUVOXEL_CLIENT_INVALID:missing net/nuvoxel/client/NuvoxelClient.class".to_string()
         })?;
     Ok(())
+}
+
+fn validate_fabric_api_jar(path: &Path) -> Result<(), String> {
+    let file = File::open(path).map_err(|e| format!("ERR_NUVOXEL_FABRIC_API_INVALID:{e}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| format!("ERR_NUVOXEL_FABRIC_API_INVALID:{e}"))?;
+    let mut metadata = String::new();
+    use std::io::Read;
+    archive
+        .by_name("fabric.mod.json")
+        .map_err(|_| "ERR_NUVOXEL_FABRIC_API_INVALID:missing fabric.mod.json".to_string())?
+        .read_to_string(&mut metadata)
+        .map_err(|e| format!("ERR_NUVOXEL_FABRIC_API_INVALID:{e}"))?;
+    if metadata.contains("\"id\": \"fabric-api\"") {
+        Ok(())
+    } else {
+        Err("ERR_NUVOXEL_FABRIC_API_INVALID:not Fabric API".into())
+    }
 }
 
 async fn save_merged_version(
@@ -342,10 +444,7 @@ fn spawn_process(
     vars.insert("auth_uuid", uuid_str.to_string());
     vars.insert("auth_access_token", access_token.to_string());
     vars.insert("user_type", "legacy".into());
-    vars.insert(
-        "user_properties",
-        "{}".into(),
-    );
+    vars.insert("user_properties", "{}".into());
     vars.insert(
         "version_type",
         version_json["type"].as_str().unwrap_or("release").into(),
@@ -368,12 +467,7 @@ fn spawn_process(
     } else {
         Vec::new()
     };
-    classpath_entries.extend(
-        library_jars
-            .iter()
-            .filter(|p| p.exists())
-            .cloned(),
-    );
+    classpath_entries.extend(library_jars.iter().filter(|p| p.exists()).cloned());
     if !bootstrap {
         if let Some(jar) = client_jar {
             if jar.exists() {
@@ -384,15 +478,10 @@ fn spawn_process(
     let classpath = build_classpath(&classpath_entries);
     vars.insert("classpath", classpath.clone());
     let library_dir = game_dir.join("libraries");
-    vars.insert(
-        "library_directory",
-        path_for_java(&library_dir),
-    );
+    vars.insert("library_directory", path_for_java(&library_dir));
     vars.insert("classpath_separator", ";".into());
 
-    let main_class = version_json["mainClass"]
-        .as_str()
-        .ok_or("ERR_MAIN_CLASS")?;
+    let main_class = version_json["mainClass"].as_str().ok_or("ERR_MAIN_CLASS")?;
 
     let xms_mb = if opts.memory_mb <= 2048 {
         (opts.memory_mb / 2).max(256)
@@ -436,19 +525,11 @@ fn spawn_process(
     }
 
     if !opts.jvm_params.trim().is_empty() {
-        jvm_args.extend(
-            opts.jvm_params
-                .split_whitespace()
-                .map(str::to_string),
-        );
+        jvm_args.extend(opts.jvm_params.split_whitespace().map(str::to_string));
     }
 
     let game_args = if version_json.get("arguments").is_some() {
-        process_arguments(
-            version_json["arguments"].get("game"),
-            &vars,
-            "windows",
-        )
+        process_arguments(version_json["arguments"].get("game"), &vars, "windows")
     } else {
         legacy_arguments(version_json, &vars)
     };
@@ -494,7 +575,9 @@ fn spawn_process(
     let mut cmd = Command::new(java);
     cmd.arg(&arg_prefix)
         .current_dir(game_dir)
-        .stdout(Stdio::from(log_file.try_clone().map_err(|e| e.to_string())?))
+        .stdout(Stdio::from(
+            log_file.try_clone().map_err(|e| e.to_string())?,
+        ))
         .stderr(Stdio::from(log_file));
 
     // Hide java.exe console window on Windows (logs go to nuvoxel-latest.log).
@@ -505,22 +588,14 @@ fn spawn_process(
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let mut child = cmd.spawn().map_err(|_| {
-        format!(
-            "ERR_JAVA_SPAWN:{}|{}",
-            java.display(),
-            opts.version
-        )
-    })?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|_| format!("ERR_JAVA_SPAWN:{}|{}", java.display(), opts.version))?;
 
     for _ in 0..20 {
         std::thread::sleep(Duration::from_millis(500));
         if let Ok(Some(status)) = child.try_wait() {
-            return Err(format!(
-                "ERR_EXIT_EARLY:{}|{}",
-                status,
-                log_path.display()
-            ));
+            return Err(format!("ERR_EXIT_EARLY:{}|{}", status, log_path.display()));
         }
         if log_shows_crash(&log_path) {
             let _ = child.kill();
@@ -668,6 +743,25 @@ fn parse_mc_version_parts(version: &str) -> Option<(u32, u32)> {
     Some((major, minor))
 }
 
+fn parse_mc_version_tuple(version: &str) -> Option<(u32, u32, u32)> {
+    let base = version.split('-').next().unwrap_or(version);
+    let mut parts = base.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts.next().map(str::parse).transpose().ok()?.unwrap_or(0);
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((major, minor, patch))
+}
+
+fn is_supported_nuvoxel_version(version: &str) -> bool {
+    let Some(version) = parse_mc_version_tuple(version) else {
+        return false;
+    };
+    version >= (1, 21, 4) && version <= (26, 2, 0)
+}
+
 fn version_supports_quick_play(version: &str) -> bool {
     parse_mc_version_parts(version)
         .map(|(major, minor)| major > 1 || (major == 1 && minor >= 20))
@@ -723,8 +817,15 @@ fn sanitize_game_arguments(args: &mut Vec<String>) {
 fn game_option_requires_value(arg: &str) -> bool {
     matches!(
         arg,
-        "--world" | "--server" | "--port" | "--username" | "--uuid" | "--accessToken"
-            | "--quickPlaySingleplayer" | "--quickPlayMultiplayer" | "--quickPlayRealms"
+        "--world"
+            | "--server"
+            | "--port"
+            | "--username"
+            | "--uuid"
+            | "--accessToken"
+            | "--quickPlaySingleplayer"
+            | "--quickPlayMultiplayer"
+            | "--quickPlayRealms"
     ) || arg.starts_with("--quickPlay")
 }
 
@@ -739,10 +840,7 @@ fn offline_multiplayer_jvm_args() -> Vec<String> {
 }
 
 #[tauri::command]
-pub async fn launch_minecraft(
-    app: AppHandle,
-    options: LaunchOptions,
-) -> Result<u32, String> {
+pub async fn launch_minecraft(app: AppHandle, options: LaunchOptions) -> Result<u32, String> {
     launch(&app, options).await
 }
 
@@ -757,4 +855,34 @@ pub async fn detect_java(
         &version,
     )?;
     Ok(path.to_string_lossy().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{fabric_api_versions_url, is_safe_jar_filename, is_supported_nuvoxel_version};
+
+    #[test]
+    fn accepts_only_the_nuvoxel_version_window() {
+        assert!(is_supported_nuvoxel_version("1.21.4"));
+        assert!(is_supported_nuvoxel_version("1.21.5"));
+        assert!(is_supported_nuvoxel_version("26.2"));
+        assert!(!is_supported_nuvoxel_version("1.21.3"));
+        assert!(!is_supported_nuvoxel_version("26.2.1"));
+        assert!(!is_supported_nuvoxel_version("snapshot"));
+    }
+
+    #[test]
+    fn rejects_unsafe_modrinth_filenames() {
+        assert!(is_safe_jar_filename("fabric-api-0.119.2+1.21.4.jar"));
+        assert!(!is_safe_jar_filename("../fabric-api.jar"));
+        assert!(!is_safe_jar_filename("fabric-api.zip"));
+    }
+
+    #[test]
+    fn asks_modrinth_for_the_selected_fabric_api() {
+        let url = fabric_api_versions_url("1.21.4").unwrap();
+        let query: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(query.get("game_versions"), Some(&"[\"1.21.4\"]".to_string()));
+        assert_eq!(query.get("loaders"), Some(&"[\"fabric\"]".to_string()));
+    }
 }

@@ -633,6 +633,7 @@ export const ru = {
   skinNoResults: "Ничего не найдено",
 
   progressLoader: "Установка загрузчика модов…",
+  progressNuvoxel: "Загрузка Nuvoxel Client и Fabric API…",
   progressManifest: "Получение информации о версии…",
   progressClient: "Загрузка клиента Minecraft…",
   progressLibraries: "Загрузка библиотек…",

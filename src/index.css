@@ -410,3 +410,76 @@ input[type="range"]::-webkit-slider-thumb:hover {
   box-shadow: 0 0 20px var(--accent);
 }
 
+/* Nuvoxel Studio redesign -------------------------------------------------- */
+:root,
+[data-theme="dark"] {
+  --bg-primary: #090c0d;
+  --bg-secondary: #101416;
+  --bg-card: rgba(20, 25, 27, 0.82);
+  --bg-elevated: rgba(27, 33, 35, 0.95);
+  --border-color: rgba(226, 232, 240, 0.08);
+  --border-highlight: rgba(226, 232, 240, 0.16);
+  --text-primary: #f5f8f6;
+  --text-secondary: #b1bcb7;
+  --text-muted: #76847d;
+  --accent: #41c793;
+  --accent-hover: #2cab7c;
+}
+
+body {
+  background:
+    radial-gradient(56rem 34rem at 72% -16%, rgba(65, 199, 147, 0.14), transparent 62%),
+    radial-gradient(48rem 30rem at -12% 90%, rgba(34, 211, 238, 0.08), transparent 58%),
+    #090c0d;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.launcher-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), transparent 24%, transparent 76%, rgba(65,199,147,.04));
+}
+
+.glass-card {
+  border-color: rgba(226, 232, 240, 0.09);
+  background: linear-gradient(145deg, rgba(28, 35, 36, 0.86), rgba(16, 21, 23, 0.76));
+  box-shadow: 0 18px 48px -28px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255,255,255,.045);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+[data-hover-effects="true"] .glass-card:hover,
+[data-hover-effects="true"] .shimmer-surface:hover {
+  border-color: rgba(110, 231, 183, 0.30);
+  box-shadow: 0 22px 52px -28px rgba(0, 0, 0, .9), 0 0 0 1px rgba(110,231,183,.05);
+}
+
+.app-titlebar + div main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.018), transparent 26%);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(177, 188, 183, .22); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(110, 231, 183, .65); border: 2px solid transparent; background-clip: padding-box; }
+
+@media (max-width: 900px) {
+  .launcher-sidebar { width: 78px !important; }
+}

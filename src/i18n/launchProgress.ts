@@ -9,6 +9,7 @@ export interface LaunchProgressPayload {
 
 const STAGE_KEYS: Record<string, TranslationKey> = {
   loader: "progressLoader",
+  nuvoxel: "progressNuvoxel",
   manifest: "progressManifest",
   client: "progressClient",
   libraries: "progressLibraries",
@@ -41,6 +42,18 @@ export function translateLaunchError(raw: string): string {
   }
   if (raw === "ERR_NUVOXEL_CLIENT_UNAVAILABLE") {
     return "Мод Nuvoxel ще не опублікований на сервері.";
+  }
+  if (raw.startsWith("ERR_NUVOXEL_UNSUPPORTED_VERSION:")) {
+    return `Nuvoxel Client підтримує Minecraft 1.21.4–26.2, а не ${raw.slice("ERR_NUVOXEL_UNSUPPORTED_VERSION:".length)}.`;
+  }
+  if (raw === "ERR_NUVOXEL_REQUIRES_FABRIC") {
+    return "Nuvoxel Client потребує Fabric Loader.";
+  }
+  if (raw.startsWith("ERR_NUVOXEL_FABRIC_API_UNAVAILABLE:")) {
+    return `Для Minecraft ${raw.slice("ERR_NUVOXEL_FABRIC_API_UNAVAILABLE:".length)} ще немає сумісної Fabric API.`;
+  }
+  if (raw.startsWith("ERR_NUVOXEL_FABRIC_API")) {
+    return "Не вдалося завантажити або перевірити Fabric API для Nuvoxel Client.";
   }
   if (raw.startsWith("ERR_NUVOXEL_CLIENT_DOWNLOAD:")) {
     return "Не вдалося завантажити мод Nuvoxel. Перевірте підключення до інтернету та повторіть спробу.";

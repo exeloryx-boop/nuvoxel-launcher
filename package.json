@@ -7,6 +7,7 @@
     "start": "node api/server.js",
     "dev": "vite",
     "dev:website": "vite --config website/vite.config.ts",
+    "dev:full": "node scripts/dev-website-with-api.mjs",
     "skins:expand": "node scripts/expand-skin-catalog.mjs",
     "icons:sync": "node scripts/sync-icons.mjs",
     "build": "npm run icons:sync && tsc && vite build && npm run build:website",

@@ -610,6 +610,7 @@ export const uk: Record<keyof typeof ru, string> = {
   skinNoResults: "Нічого не знайдено",
 
   progressLoader: "Встановлення завантажувача модів…",
+  progressNuvoxel: "Завантаження Nuvoxel Client і Fabric API…",
   progressManifest: "Отримання інформації про версію…",
   progressClient: "Завантаження клієнта Minecraft…",
   progressLibraries: "Завантаження бібліотек…",

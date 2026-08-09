@@ -55,6 +55,8 @@ export function LoginPage() {
       if (!res.ok) {
         if (res.error === "INVALID_CREDENTIALS") {
           setErrorMsg("Невірний логін або пароль лаунчера");
+        } else if (res.error === "NETWORK_ERROR") {
+          setErrorMsg("Не вдалося з'єднатися з API сервером Nuvoxel. Переконайтеся, що бекенд запустить команду 'npm run dev:api' або 'node server.js'");
         } else {
           setErrorMsg(res.error || "Помилка входу");
         }
