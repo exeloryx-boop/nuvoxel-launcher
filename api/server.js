@@ -1349,6 +1349,42 @@ app.post("/auth/profile/status", auth, (req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+// Public stats endpoint for home page live counter widget
+app.get("/public/stats", (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const now = Date.now();
+    const onlineUsers = Object.values(db.users).filter(
+      (u) => now - (u.lastSeenAt || 0) < ONLINE_WINDOW_MS
+    ).length;
+    return {
+      onlineCount: Math.max(onlineUsers, 1), // At least 1 (the visitor/server)
+      registeredCount: Object.keys(db.users).length,
+      sharedPacksCount: (db.sharedPacks || []).length,
+      chatMessagesCount: (db.chatMessages || []).length,
+      status: "online",
+      serverIp: "play.nuvoxel.net",
+    };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Update user cape
+app.post("/auth/profile/cape", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const user = db.users[req.auth.sub];
+    if (!user) throw new ApiError(404, "NOT_FOUND");
+    const { cape } = req.body || {};
+    user.cape = String(cape || "none").slice(0, 50);
+    saveDb(db);
+    return { ok: true, cape: user.cape };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 // Admin: server configuration endpoint
 app.get("/admin/server-config", auth, adminAuth, (_req, res) => {
   void withDb(() => {
@@ -1378,6 +1414,7 @@ if (existsSync(PUBLIC_DIR)) {
   // SPA fallback — serve index.html for all frontend navigation routes
   const API_PREFIXES = [
     "/auth/",
+    "/public/stats",
     "/admin/stats",
     "/admin/users",
     "/admin/chat",

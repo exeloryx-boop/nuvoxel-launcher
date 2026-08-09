@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -10,11 +11,43 @@ import {
   ShieldCheck,
   Sparkles,
   Zap,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useWebI18n } from "../hooks/useWebI18n";
+import { getApiBase } from "../store/useWebsiteStore";
+
+interface LiveStats {
+  onlineCount: number;
+  registeredCount: number;
+  sharedPacksCount: number;
+  chatMessagesCount: number;
+  status: string;
+  serverIp: string;
+}
 
 export function HomePage() {
   const { t, skinCategory } = useWebI18n();
+  const [stats, setStats] = useState<LiveStats | null>(null);
+  const [copiedIp, setCopiedIp] = useState(false);
+
+  useEffect(() => {
+    fetch(`${getApiBase()}/public/stats`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStats(data);
+      })
+      .catch(() => {
+        /* offline fallback */
+      });
+  }, []);
+
+  const copyIp = () => {
+    navigator.clipboard.writeText("play.nuvoxel.net");
+    setCopiedIp(true);
+    setTimeout(() => setCopiedIp(false), 2000);
+  };
+
   const features = [
     { icon: Server, label: t("homeServersLabel"), title: t("homeServersTitle"), text: t("homeServersBullet1") },
     { icon: Boxes, label: t("homeModsLabel"), title: t("homeModsTitle"), text: t("homeModsBullet1") },
@@ -29,12 +62,22 @@ export function HomePage() {
         <div className="studio-orb studio-orb-two" />
         <div className="studio-hero-inner">
           <div className="studio-hero-copy">
+            {/* Live Status Badge */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-400 mb-2 shadow-sm animate-pulse-glow">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Сервер Активний · {stats ? `${stats.onlineCount} Гравців онлайн` : "Підключено до Render"}</span>
+            </div>
+
             <div className="studio-eyebrow"><span /> {t("homeHeroLabel")}</div>
             <h1>{t("homeHeroTitle1")} <em>{t("homeHeroTitle2")}</em></h1>
             <p>{t("homeHeroDesc")}</p>
+
             <div className="studio-actions">
               <Link to="/download" className="studio-primary"><Download className="h-4 w-4" />{t("homeDownloadWin")}</Link>
-              <Link to="/features" className="studio-secondary">{t("homeFeaturesTitle")}<ArrowRight className="h-4 w-4" /></Link>
+              <button onClick={copyIp} className="studio-secondary flex items-center gap-2">
+                {copiedIp ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                <span>{copiedIp ? "IP Скопійовано!" : "play.nuvoxel.net"}</span>
+              </button>
             </div>
             <div className="studio-trust"><ShieldCheck className="h-4 w-4" /><span>{t("homeTagline")}</span></div>
           </div>
@@ -46,7 +89,11 @@ export function HomePage() {
               <main>
                 <div className="studio-console-head"><div><small>WELCOME BACK</small><strong>Ready to create?</strong></div><span>ONLINE</span></div>
                 <div className="studio-game-card"><div className="studio-game-art"><Sparkles className="h-8 w-8" /></div><div><small>SELECTED PROFILE</small><h3>Nuvoxel Visual</h3><p>Minecraft 1.21.4 · Fabric</p><button><Play className="h-3.5 w-3.5 fill-current" /> PLAY NOW</button></div></div>
-                <div className="studio-console-stats"><div><strong>24/7</strong><span>Community</span></div><div><strong>50K+</strong><span>Skins</span></div><div><strong>∞</strong><span>Possibilities</span></div></div>
+                <div className="studio-console-stats">
+                  <div><strong>{stats?.registeredCount ?? "100+"}</strong><span>Гравців</span></div>
+                  <div><strong>{stats?.sharedPacksCount ?? "12"}</strong><span>Збірок AI</span></div>
+                  <div><strong>24/7</strong><span>Онлайн API</span></div>
+                </div>
               </main>
             </div>
           </div>
