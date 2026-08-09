@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   User,
@@ -13,10 +13,34 @@ import {
   CheckCircle2,
   Zap,
   Activity,
-  Award
+  Award,
+  RefreshCw,
+  MessageSquare,
+  Package,
+  Clock,
+  Wifi,
+  WifiOff,
+  Calendar,
 } from "lucide-react";
-import { useWebsiteStore } from "../store/useWebsiteStore";
+import { useWebsiteStore, getApiBase } from "../store/useWebsiteStore";
 import { getSkinAvatarUrl } from "@shared/skins";
+
+interface ProfileData {
+  id: string;
+  username: string;
+  email: string;
+  friendCode: string;
+  role: string;
+  createdAt: number;
+  lastSeenAt: number;
+  online: boolean;
+  status: string;
+  friendsCount: number;
+  chatCount: number;
+  packsCount: number;
+  bannedUntil: number | null;
+  mutedUntil: number | null;
+}
 
 export function ProfilePage() {
   const auth = useWebsiteStore((s) => s.auth);
@@ -26,9 +50,40 @@ export function ProfilePage() {
   const [statusMsg, setStatusMsg] = useState("В мережі — Nuvoxel Launcher");
   const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [tempStatus, setTempStatus] = useState(statusMsg);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncTime, setSyncTime] = useState<number | null>(null);
 
   const isAdmin = auth?.loggedIn && (auth.role === "admin" || auth.username.toLowerCase() === "admin");
-  const friendCode = auth?.friendCode ? `#${auth.friendCode}` : "#NVXL77";
+  const friendCode = profile?.friendCode || auth?.friendCode || "#NVXL77";
+
+  // Fetch live profile from API
+  const fetchProfile = async () => {
+    if (!auth?.token) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`${getApiBase()}/auth/profile`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+        if (data.status) setStatusMsg(data.status);
+        setSyncTime(Date.now());
+      }
+    } catch {
+      /* offline fallback */
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+    // Auto-sync every 30s
+    const interval = setInterval(fetchProfile, 30000);
+    return () => clearInterval(interval);
+  }, [auth?.token]);
 
   const copyFriendCode = () => {
     navigator.clipboard.writeText(friendCode);
@@ -36,9 +91,35 @@ export function ProfilePage() {
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleSaveStatus = () => {
+  const handleSaveStatus = async () => {
     setStatusMsg(tempStatus);
     setIsEditingStatus(false);
+    if (!auth?.token) return;
+    try {
+      await fetch(`${getApiBase()}/auth/profile/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ status: tempStatus }),
+      });
+    } catch { /* ignore */ }
+  };
+
+  const formatDate = (ts: number) =>
+    new Date(ts).toLocaleDateString("uk-UA", {
+      day: "2-digit", month: "long", year: "numeric",
+    });
+
+  const timeSince = (ts: number) => {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "щойно";
+    if (mins < 60) return `${mins} хв тому`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} год тому`;
+    return `${Math.floor(hrs / 24)} дн тому`;
   };
 
   if (!auth?.loggedIn) {
@@ -64,6 +145,22 @@ export function ProfilePage() {
       <div className="orb orb-3 opacity-30"></div>
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 relative z-10 space-y-8">
+        {/* Sync Status Bar */}
+        <div className="flex items-center justify-between animate-fade-up">
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            {syncing ? (
+              <><RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--studio-mint)]" /> Синхронізація...</>
+            ) : syncTime ? (
+              <><Wifi className="h-3.5 w-3.5 text-emerald-400" /> Синхронізовано {timeSince(syncTime)}</>
+            ) : (
+              <><WifiOff className="h-3.5 w-3.5 text-zinc-600" /> Офлайн-режим</>
+            )}
+          </div>
+          <button onClick={fetchProfile} className="btn-micro text-xs text-zinc-500 hover:text-white flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 bg-white/5">
+            <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} /> Оновити
+          </button>
+        </div>
+
         {/* Profile Hero Card */}
         <div className="glass-card glow-border overflow-hidden p-6 sm:p-8 animate-fade-up">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -92,14 +189,14 @@ export function ProfilePage() {
                       Адміністратор
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--nl-green)]/40 bg-[var(--nl-green)]/20 px-3 py-0.5 text-xs font-semibold text-[var(--nl-green)]">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--studio-mint)]/40 bg-[var(--studio-mint)]/20 px-3 py-0.5 text-xs font-semibold text-[var(--studio-mint)]">
                       <Award className="h-3.5 w-3.5" />
                       Гравець Nuvoxel
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Акаунт підтверджено
+                    Синхронізовано
                   </span>
                 </div>
 
@@ -111,10 +208,11 @@ export function ProfilePage() {
                         type="text"
                         value={tempStatus}
                         onChange={(e) => setTempStatus(e.target.value)}
-                        className="rounded-lg border border-white/20 bg-black/40 px-3 py-1 text-xs text-white outline-none focus:border-[var(--nl-green)]"
+                        className="rounded-lg border border-white/20 bg-black/40 px-3 py-1 text-xs text-white outline-none focus:border-[var(--studio-mint)]"
                         placeholder="Введіть ваш статус..."
+                        onKeyDown={(e) => e.key === "Enter" && handleSaveStatus()}
                       />
-                      <button onClick={handleSaveStatus} className="btn-micro rounded-md bg-[var(--nl-green)] px-2 py-1 text-xs font-semibold text-white">
+                      <button onClick={handleSaveStatus} className="btn-micro rounded-md bg-[var(--studio-mint)] px-2 py-1 text-xs font-semibold text-black">
                         Зберегти
                       </button>
                     </div>
@@ -124,7 +222,7 @@ export function ProfilePage() {
                       className="cursor-pointer text-sm text-zinc-400 hover:text-white transition flex items-center gap-1.5"
                       title="Натисніть для редагування статусу"
                     >
-                      <Activity className="h-3.5 w-3.5 text-[var(--nl-green)] animate-pulse" />
+                      <Activity className="h-3.5 w-3.5 text-[var(--studio-mint)] animate-pulse" />
                       <span>"{statusMsg}"</span>
                     </p>
                   )}
@@ -145,13 +243,33 @@ export function ProfilePage() {
           </div>
         </div>
 
+        {/* Live Stats Grid */}
+        <div className="grid gap-5 sm:grid-cols-4">
+          {[
+            { icon: Users, label: "Друзів", value: profile?.friendsCount ?? 0, accent: "text-[var(--studio-mint)]", bg: "bg-emerald-500/10 border-emerald-500/20" },
+            { icon: MessageSquare, label: "Повідомлень", value: profile?.chatCount ?? 0, accent: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+            { icon: Package, label: "Збірок", value: profile?.packsCount ?? 0, accent: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+            { icon: Calendar, label: "Акаунт створено", value: profile?.createdAt ? formatDate(profile.createdAt) : "—", accent: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
+          ].map((s, i) => (
+            <div key={s.label} className="glass-card hover-lift p-5 animate-fade-up" style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+              <div className="flex items-center justify-between text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                <span>{s.label}</span>
+                <div className={`rounded-lg ${s.bg} border p-2`}>
+                  <s.icon className={`h-4 w-4 ${s.accent}`} />
+                </div>
+              </div>
+              <p className={`text-2xl font-extrabold ${s.accent}`}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Info Grid Cards */}
         <div className="grid gap-6 sm:grid-cols-3">
           {/* Card 1: Friend Code */}
           <div className="glass-card hover-lift p-6 animate-fade-up delay-100">
             <div className="flex items-center justify-between text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-2">
               <span>Код Друга Nuvoxel</span>
-              <Users className="h-4 w-4 text-[var(--nl-green)]" />
+              <Users className="h-4 w-4 text-[var(--studio-mint)]" />
             </div>
             <div className="flex items-center justify-between mt-3 rounded-xl border border-white/10 bg-black/40 p-3">
               <span className="font-mono text-lg font-bold text-amber-300">{friendCode}</span>
@@ -177,8 +295,14 @@ export function ProfilePage() {
               <span className="text-sm font-semibold text-white">Синхронізовано з Лаунчером</span>
             </div>
             <p className="mt-3 text-xs text-zinc-400">
-              Ваш акаунт повністю синхронізовано з клієнтом Minecraft 1.21.8.
+              Профіль, скіни та друзі синхронізуються автоматично кожні 30 секунд.
             </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-zinc-500" />
+              <span className="text-[11px] text-zinc-500">
+                {profile?.lastSeenAt ? `Останній вхід: ${timeSince(profile.lastSeenAt)}` : "Очікування синхронізації..."}
+              </span>
+            </div>
           </div>
 
           {/* Card 3: Skin & Customization */}
@@ -190,7 +314,7 @@ export function ProfilePage() {
             <div className="mt-3 text-sm font-semibold text-white truncate">
               {selectedSkin ? selectedSkin.name : "Класичний скін (Steve)"}
             </div>
-            <Link to="/skins" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--nl-green)] hover:underline">
+            <Link to="/skins" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--studio-mint)] hover:underline">
               <Sparkles className="h-3.5 w-3.5" />
               Змінити скін або плащ →
             </Link>
@@ -200,7 +324,7 @@ export function ProfilePage() {
         {/* Main Details & Features */}
         <div className="glass-card p-6 sm:p-8 animate-fade-up delay-400">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-[var(--nl-green)]" />
+            <Zap className="h-5 w-5 text-[var(--studio-mint)]" />
             Переваги вашого профілю
           </h2>
 
@@ -220,9 +344,9 @@ export function ProfilePage() {
             </div>
 
             <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 hover:border-white/20 transition">
-              <h3 className="font-semibold text-white text-sm">🛡️ Модерація та захист</h3>
+              <h3 className="font-semibold text-white text-sm">🔄 Авто-синхронізація</h3>
               <p className="mt-1 text-xs text-zinc-400">
-                Ваш акаунт захищений анти-чітом та вбудованим фільтром безпеки Nuvoxel.
+                Ваш статус, скіни та налаштування синхронізуються між сайтом та лаунчером у реальному часі.
               </p>
             </div>
 

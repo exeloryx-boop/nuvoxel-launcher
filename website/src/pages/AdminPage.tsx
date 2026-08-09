@@ -104,7 +104,30 @@ const getApiBase = () => {
   return "https://nuvoxel-launcher-z6va.onrender.com";
 };
 
-type Tab = "overview" | "users" | "launcher" | "claude" | "moderation";
+interface ActivityItem {
+  type: "registration" | "ban" | "mute" | "chat" | "flagged_message" | "violation";
+  username: string;
+  userId: string;
+  timestamp: number;
+  detail: string;
+}
+
+interface ServerConfig {
+  port: number;
+  dbSize: number;
+  totalUsers: number;
+  totalMessages: number;
+  totalViolations: number;
+  totalPacks: number;
+  totalFriendships: number;
+  hasCurseForge: boolean;
+  nodeVersion: string;
+  platform: string;
+  memoryUsage: number;
+  uptimeHours: number;
+}
+
+type Tab = "overview" | "users" | "launcher" | "claude" | "moderation" | "activity" | "system";
 
 export function AdminPage() {
   const auth = useWebsiteStore((s) => s.auth);
@@ -114,6 +137,8 @@ export function AdminPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [sharedPacks, setSharedPacks] = useState<SharedPack[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityItem[]>([]);
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<"all" | "admin" | "user">("all");
@@ -121,6 +146,8 @@ export function AdminPage() {
 
   // Modals state
   const [modTargetUser, setModTargetUser] = useState<AdminUser | null>(null);
+  const [resetPassUser, setResetPassUser] = useState<AdminUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [banDuration, setBanDuration] = useState<number>(60); // minutes, -1 = perm, 0 = unban
   const [muteDuration, setMuteDuration] = useState<number>(30);
   const [modReason, setModReason] = useState("");
@@ -181,6 +208,34 @@ export function AdminPage() {
     setTimeout(() => setStatusMsg(""), 3000);
   };
 
+  const handleResetPassword = async (userId: string, pass: string) => {
+    if (!pass || pass.length < 4) {
+      setStatusMsg("Пароль має містити як мінімум 4 символи");
+      setTimeout(() => setStatusMsg(""), 3000);
+      return;
+    }
+    try {
+      const res = await fetch(`${getApiBase()}/admin/users/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`,
+        },
+        body: JSON.stringify({ userId, newPassword: pass }),
+      });
+      if (res.ok) {
+        setStatusMsg("🔑 Пароль користувача успішно змінено!");
+      } else {
+        setStatusMsg("Помилка зміни пароля");
+      }
+    } catch {
+      setStatusMsg("Помилка мережі");
+    }
+    setResetPassUser(null);
+    setNewPassword("");
+    setTimeout(() => setStatusMsg(""), 3000);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -189,18 +244,22 @@ export function AdminPage() {
       if (auth?.token) {
         headers["Authorization"] = `Bearer ${auth.token}`;
       }
-      const [statsRes, usersRes, chatRes, violRes, packsRes] = await Promise.all([
+      const [statsRes, usersRes, chatRes, violRes, packsRes, actRes, cfgRes] = await Promise.all([
         fetch(`${apiBase}/admin/stats`, { headers }),
         fetch(`${apiBase}/admin/users`, { headers }),
         fetch(`${apiBase}/admin/chat`, { headers }),
         fetch(`${apiBase}/admin/violations`, { headers }),
         fetch(`${apiBase}/admin/claude/packs`, { headers }),
+        fetch(`${apiBase}/admin/activity-log`, { headers }),
+        fetch(`${apiBase}/admin/server-config`, { headers }),
       ]);
       if (statsRes.ok) setStats(await statsRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
       if (chatRes.ok) setChatMessages(await chatRes.json());
       if (violRes.ok) setViolations(await violRes.json());
       if (packsRes.ok) setSharedPacks(await packsRes.json());
+      if (actRes.ok) setActivityLogs(await actRes.json());
+      if (cfgRes.ok) setServerConfig(await cfgRes.json());
       await fetchBroadcast();
     } catch (e) {
       console.error("Admin fetch error:", e);
@@ -395,6 +454,8 @@ export function AdminPage() {
     { id: "users", label: "Користувачі", icon: Users },
     { id: "launcher", label: "Лаунчер & Чат", icon: Gamepad2 },
     { id: "moderation", label: "Модерація & Фільтр", icon: ShieldAlert, badge: unresolvedViolationsCount },
+    { id: "activity", label: "Журнал дій", icon: Radio },
+    { id: "system", label: "Система & Сервер", icon: Server },
   ];
 
   return (
@@ -729,6 +790,13 @@ export function AdminPage() {
                               <ShieldAlert className="h-4 w-4" />
                             </button>
                             <button
+                              onClick={() => setResetPassUser(u)}
+                              className="btn-micro rounded-lg border border-sky-500/30 bg-sky-500/10 p-2 text-xs text-sky-300 hover:bg-sky-500/20"
+                              title="Зкинути пароль"
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleToggleRole(u.id, u.role)}
                               className="btn-micro rounded-lg border border-white/10 bg-black/30 p-2 text-xs hover:border-purple-500/50 hover:text-purple-400 transition"
                               title="Змінити роль"
@@ -972,6 +1040,120 @@ export function AdminPage() {
         </div>
       )}
 
+      {/* ═══ TAB: ACTIVITY LOG ═══ */}
+      {tab === "activity" && (
+        <div className="space-y-6 animate-fade-up">
+          <div className="glass-card p-6">
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <Radio className="h-5 w-5 text-[var(--nl-green)] animate-pulse" />
+              Журнал активностей та подій сервера
+            </h2>
+            <p className="text-xs text-zinc-400 mb-6">
+              Останні реєстрації, бани, мути, порушення фільтрів та модерація у реальному часі.
+            </p>
+
+            {activityLogs.length === 0 ? (
+              <div className="py-12 text-center text-zinc-500">Жодної активності не зафіксовано</div>
+            ) : (
+              <div className="space-y-3">
+                {activityLogs.map((item, idx) => {
+                  const badgeStyle =
+                    item.type === "ban"
+                      ? "bg-red-500/20 text-red-300 border-red-500/30"
+                      : item.type === "mute"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      : item.type === "registration"
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                      : item.type === "violation" || item.type === "flagged_message"
+                      ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                      : "bg-zinc-800 text-zinc-400 border-white/5";
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between rounded-xl border border-white/5 bg-black/30 p-4 hover:border-white/20 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold border uppercase tracking-wider ${badgeStyle}`}>
+                          {item.type}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{item.detail}</p>
+                          <p className="text-xs text-zinc-500 font-mono">Користувач: {item.username} ({item.userId})</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono text-zinc-500">{formatTime(item.timestamp)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ TAB: SYSTEM & SERVER CONFIG ═══ */}
+      {tab === "system" && (
+        <div className="space-y-6 animate-fade-up">
+          <div className="glass-card p-6">
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <Server className="h-5 w-5 text-purple-400" />
+              Стан Сервера та Конфігурація Wynsense
+            </h2>
+            <p className="text-xs text-zinc-400 mb-6">
+              Інформація про систему, використання пам'яті, підключення CurseForge та статистику бази даних.
+            </p>
+
+            {serverConfig ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Статус API</span>
+                  <div className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-lg font-bold text-emerald-400">Активний (Порт {serverConfig.port})</span>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">Uptime: {serverConfig.uptimeHours} год</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Пам'ять (RAM)</span>
+                  <p className="text-2xl font-extrabold text-sky-400">{serverConfig.memoryUsage} MB</p>
+                  <p className="mt-2 text-xs text-zinc-500">Node {serverConfig.nodeVersion} on {serverConfig.platform}</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Розмір бази JSON</span>
+                  <p className="text-2xl font-extrabold text-amber-400">{(serverConfig.dbSize / 1024).toFixed(1)} KB</p>
+                  <p className="mt-2 text-xs text-zinc-500">{serverConfig.totalUsers} користувачів, {serverConfig.totalMessages} повідомлень</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">CurseForge Проксі</span>
+                  <p className={`text-lg font-bold ${serverConfig.hasCurseForge ? "text-emerald-400" : "text-amber-400"}`}>
+                    {serverConfig.hasCurseForge ? "✅ Підключено" : "⚠️ Режим авто-пошуку"}
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">Прямий завантажувач модів</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Порушень і Банів</span>
+                  <p className="text-2xl font-extrabold text-purple-400">{serverConfig.totalViolations}</p>
+                  <p className="mt-2 text-xs text-zinc-500">Зафіксовано авто-фільтром</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Збірок Клод АІ</span>
+                  <p className="text-2xl font-extrabold text-[var(--nl-green)]">{serverConfig.totalPacks}</p>
+                  <p className="mt-2 text-xs text-zinc-500">Опубліковано спільнотою</p>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-zinc-500">Завантаження конфігурації...</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ═══ MODERATION MODAL (BAN / MUTE) ═══ */}
       {modTargetUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
@@ -1074,6 +1256,51 @@ export function AdminPage() {
                     Розмутити
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ RESET PASSWORD MODAL ═══ */}
+      {resetPassUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="glass-card glow-border max-w-md w-full p-6 animate-scale-up border-sky-500/30">
+            <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-sky-400" />
+                <h3 className="font-bold text-lg text-white">Зміна пароля: {resetPassUser.username}</h3>
+              </div>
+              <button onClick={() => setResetPassUser(null)} className="text-zinc-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-400 block mb-1">Новий пароль для користувача</label>
+                <input
+                  type="password"
+                  placeholder="Вкажіть новий пароль..."
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2 text-sm outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleResetPassword(resetPassUser.id, newPassword)}
+                  className="btn-primary bg-sky-600 hover:bg-sky-700 text-xs py-2.5 w-full font-bold"
+                >
+                  Зберегти новий пароль
+                </button>
+                <button
+                  onClick={() => setResetPassUser(null)}
+                  className="btn-outline text-xs py-2.5 w-full"
+                >
+                  Скасувати
+                </button>
               </div>
             </div>
           </div>

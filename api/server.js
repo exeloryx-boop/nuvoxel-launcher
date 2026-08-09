@@ -1190,6 +1190,188 @@ app.post("/admin/violations/clear-resolved", auth, adminAuth, (_req, res) => {
     .catch((e) => sendError(res, e));
 });
 
+// Admin: reset user password
+app.post("/admin/users/reset-password", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId, newPassword } = req.body || {};
+    const user = db.users[userId];
+    if (!user) throw new ApiError(404, "USER_NOT_FOUND");
+    if (!newPassword || newPassword.length < 4) throw new ApiError(400, "INVALID_PASSWORD");
+    user.passwordHash = bcrypt.hashSync(newPassword, 10);
+    saveDb(db);
+    return { ok: true, userId, username: user.username };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: set admin note on user
+app.post("/admin/users/note", auth, adminAuth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const { userId, note } = req.body || {};
+    const user = db.users[userId];
+    if (!user) throw new ApiError(404, "USER_NOT_FOUND");
+    user.adminNote = String(note ?? "").trim().slice(0, 500);
+    user.adminNoteAt = Date.now();
+    user.adminNoteBy = req.auth.sub;
+    saveDb(db);
+    return { ok: true, userId, note: user.adminNote };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: get activity log (recent logins, bans, chat activity)
+app.get("/admin/activity-log", auth, adminAuth, (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const logs = [];
+
+    // Recent user registrations
+    Object.values(db.users).forEach((u) => {
+      logs.push({
+        type: "registration",
+        username: u.username,
+        userId: u.id,
+        timestamp: u.createdAt,
+        detail: `Зареєстровано акаунт ${u.username}`,
+      });
+      if (u.bannedUntil) {
+        logs.push({
+          type: "ban",
+          username: u.username,
+          userId: u.id,
+          timestamp: u.bannedUntil === -1 ? (u.createdAt || Date.now()) : u.bannedUntil - 60 * 60 * 1000,
+          detail: `Забанено ${u.username}: ${u.banReason || "Без причини"}`,
+        });
+      }
+      if (u.mutedUntil) {
+        logs.push({
+          type: "mute",
+          username: u.username,
+          userId: u.id,
+          timestamp: u.mutedUntil === -1 ? (u.createdAt || Date.now()) : u.mutedUntil - 30 * 60 * 1000,
+          detail: `Замучено ${u.username}: ${u.muteReason || "Без причини"}`,
+        });
+      }
+    });
+
+    // Recent chat messages as activity
+    const recentChat = (db.chatMessages || []).slice(-30);
+    recentChat.forEach((m) => {
+      logs.push({
+        type: m.flagged ? "flagged_message" : "chat",
+        username: m.username,
+        userId: m.userId,
+        timestamp: m.timestamp,
+        detail: m.flagged ? `Порушення у чаті: "${m.text.slice(0, 50)}"` : `Повідомлення: "${m.text.slice(0, 50)}"`,
+      });
+    });
+
+    // Violations
+    (db.violations || []).forEach((v) => {
+      logs.push({
+        type: "violation",
+        username: v.username,
+        userId: v.userId,
+        timestamp: v.timestamp,
+        detail: `Порушення фільтру: ${v.words.join(", ")}`,
+      });
+    });
+
+    // Sort by timestamp descending, limit to 100
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+    return logs.slice(0, 100);
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Profile sync endpoint - returns detailed user info for logged-in user
+app.get("/auth/profile", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const user = db.users[req.auth.sub];
+    if (!user) throw new ApiError(404, "NOT_FOUND");
+
+    // Count friends
+    const friendsCount = Object.values(db.friendships).filter(
+      (f) => f.userA === user.id || f.userB === user.id
+    ).length;
+
+    // Count chat messages
+    const chatCount = (db.chatMessages || []).filter(
+      (m) => m.userId === user.id
+    ).length;
+
+    // Count shared packs
+    const packsCount = (db.sharedPacks || []).filter(
+      (p) => p.authorId === user.id
+    ).length;
+
+    const online = Date.now() - user.lastSeenAt < ONLINE_WINDOW_MS;
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      friendCode: user.friendCode,
+      role: user.role || "user",
+      createdAt: user.createdAt,
+      lastSeenAt: user.lastSeenAt,
+      online,
+      status: online ? user.status || "online" : "offline",
+      friendsCount,
+      chatCount,
+      packsCount,
+      bannedUntil: user.bannedUntil || null,
+      mutedUntil: user.mutedUntil || null,
+    };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Update profile status
+app.post("/auth/profile/status", auth, (req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    const user = db.users[req.auth.sub];
+    if (!user) throw new ApiError(404, "NOT_FOUND");
+    user.status = String(req.body?.status ?? "").trim().slice(0, 100) || "online";
+    user.lastSeenAt = Date.now();
+    saveDb(db);
+    return { ok: true, status: user.status };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
+// Admin: server configuration endpoint
+app.get("/admin/server-config", auth, adminAuth, (_req, res) => {
+  void withDb(() => {
+    const db = loadDb();
+    return {
+      port: PORT,
+      dbSize: JSON.stringify(db).length,
+      totalUsers: Object.keys(db.users).length,
+      totalMessages: (db.chatMessages || []).length,
+      totalViolations: (db.violations || []).length,
+      totalPacks: (db.sharedPacks || []).length,
+      totalFriendships: Object.keys(db.friendships).length,
+      hasCurseForge: Boolean(CURSEFORGE_API_KEY),
+      nodeVersion: process.version,
+      platform: process.platform,
+      memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      uptimeHours: Math.round(process.uptime() / 3600 * 10) / 10,
+    };
+  })
+    .then((payload) => res.json(payload))
+    .catch((e) => sendError(res, e));
+});
+
 const PUBLIC_DIR = join(__dirname, "public");
 if (existsSync(PUBLIC_DIR)) {
   app.use(express.static(PUBLIC_DIR));
@@ -1203,6 +1385,8 @@ if (existsSync(PUBLIC_DIR)) {
     "/admin/violations",
     "/admin/broadcast",
     "/admin/claude",
+    "/admin/activity-log",
+    "/admin/server-config",
     "/friends",
     "/presence",
     "/updates/",
@@ -1233,3 +1417,4 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 export default app;
+
